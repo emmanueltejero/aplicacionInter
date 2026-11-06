@@ -68,9 +68,9 @@ El 6 de noviembre de 2026, desde el entorno restaurado, Supabase respondió HTTP
 
 El flujo de este archivo se probó en navegador con respuestas simuladas para acceso correcto, contraseña incorrecta y error al consultar datos, verificando vaciado de contraseña, ausencia de almacenamiento, cierre de sesión y ancho móvil. Las contraseñas de esas pruebas son ficticias.
 
-## Publicación web con GitHub Pages (preparada, pendiente de autorización)
+## Publicación web con GitHub Pages
 
-La preparación usa el repositorio público `emmanueltejero/aplicacionInter`. La dirección prevista, una vez activado y completado el despliegue, es `https://emmanueltejero.github.io/aplicacionInter/`. Esta preparación no acredita que la web ya esté publicada.
+La preparación usa el repositorio público `emmanueltejero/aplicacionInter`. La dirección prevista, una vez activado y completado el despliegue, es `https://emmanueltejero.github.io/aplicacionInter/`. El código está subido a `main`. La primera ejecución de Actions superó las comprobaciones y la exportación; se detuvo porque Pages todavía no estaba habilitado. La web no se considera publicada hasta que el despliegue finalice correctamente.
 
 `app.config.ts` conserva `app.json` y permite exportar el sitio con la ruta del repositorio mediante `EXPO_BASE_PATH`. Para reproducir el resultado:
 
@@ -80,6 +80,6 @@ EXPO_OFFLINE=1 npm run build:pages
 
 El directorio `dist/` contiene la web y el escudo; `.nojekyll` permite servir los recursos `_expo` y `404.html` proporciona la entrada para rutas. El flujo `.github/workflows/pages.yml` instala, valida, prueba y despliega únicamente `dist`, usando Node 24. Incluye la URL y la clave **Publishable**, que son configuración pública de cliente. No utiliza contraseñas ni credenciales `service_role`; los datos del club permanecen sujetos a los permisos de Supabase.
 
-Antes del primer despliegue, el propietario debe activar **Settings → Pages → Build and deployment → Source: GitHub Actions** en GitHub. Tras autorizar la subida del código a `main`, el flujo de Actions realiza la publicación. Revisar el resultado del flujo y probar el sitio HTTPS real antes de darlo por operativo. Esta versión no tiene todavía manifiesto ni caché offline de PWA.
+Antes del primer despliegue, el propietario debe activar **Settings → Pages → Build and deployment → Source: GitHub Actions** en GitHub. Cada subida a `main` activa el flujo de publicación. Si el primer intento falló por Pages deshabilitado, actívalo y repite la ejecución desde Actions o sube un cambio nuevo. Revisar el resultado del flujo y probar el sitio HTTPS real antes de darlo por operativo. Esta versión no tiene todavía manifiesto ni caché offline de PWA.
 
 La publicación del entorno de Codex y la publicación de esta web son operaciones distintas. Los archivos descargables del chat son auxiliares y no se necesitan para usar el sitio alojado.
