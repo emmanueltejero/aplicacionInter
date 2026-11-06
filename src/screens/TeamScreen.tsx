@@ -1,0 +1,180 @@
+import { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { router, useLocalSearchParams } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
+import { Attendance, dateKey, Player, Register, summary } from '../domain';
+import { ClubRepository, Team } from '../data/repository';
+import { PlayerEditor } from '../components/PlayerEditor';
+
+const options: { value: Attendance; label: string; short: string; color: string; bg: string }[] = [
+  { value: 'present', label: 'Presente', short: 'Sí', color: '#176BA0', bg: '#DEEEFB' },
+  { value: 'absent', label: 'Ausente', short: 'No', color: '#A52D38', bg: '#FDE9EB' },
+  { value: 'excused', label: 'Justificado', short: 'Just.', color: '#855A0D', bg: '#FFF2CE' },
+];
+
+export default function TeamScreen({ team, teams, repository, onLeave }: {
+  team: Team; teams: Team[]; repository: ClubRepository; onLeave: () => Promise<void>;
+}) {
+  const { view } = useLocalSearchParams<{ view?: string }>();
+  const tab = view === 'team' ? 'team' : 'attendance';
+  const [date, setDate] = useState(() => new Date());
+  const [register, setRegister] = useState<Register>({});
+  const [roster, setRoster] = useState<Player[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [editor, setEditor] = useState<{ player?: Player } | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
+  const locked = useRef(false);
+  const key = dateKey(date);
+  const day = register[key] ?? {};
+  const activePlayers = roster.filter(player => !player.archivedAt);
+  const archivedPlayers = roster.filter(player => player.archivedAt);
+  // Retain recorded history for archived players without marking new attendance.
+  const attendancePlayers = roster.filter(player => !player.archivedAt || day[player.id]);
+  const counts = summary(attendancePlayers, day);
+
+  async function load() {
+    try {
+      const data = await repository.load(team.id);
+      setRegister(data.register); setRoster(data.roster); setLoadError(false);
+    } catch { setLoadError(true); }
+    finally { setLoading(false); }
+  }
+  useEffect(() => {
+    let active = true;
+    repository.load(team.id).then(data => {
+      if (active) { setRegister(data.register); setRoster(data.roster); setLoading(false); }
+    }).catch(() => { if (active) { setLoadError(true); setLoading(false); } });
+    return () => { active = false; };
+  }, [repository, team.id]);
+
+  async function mutate(operation: () => Promise<unknown>) {
+    if (locked.current) throw new Error('Espera a que termine el guardado.');
+    locked.current = true; setSaving(true); setError('');
+    try {
+      await operation();
+      const data = await repository.load(team.id);
+      setRegister(data.register); setRoster(data.roster);
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : 'No se pudo guardar. Revisa la conexión e inténtalo de nuevo.';
+      setError(message); throw new Error(message);
+    } finally { locked.current = false; setSaving(false); }
+  }
+  async function mark(playerId: string, value: Attendance) {
+    await mutate(() => repository.mark(team.id, key, playerId, value));
+  }
+  async function savePlayer(data: { name: string; number: number }, id?: string) {
+    await mutate(() => repository.savePlayer(team.id, data, id));
+    setEditor(null);
+  }
+  function archive(player: Player, archived: boolean) {
+    void mutate(() => repository.archivePlayer(team.id, player.id, archived)).catch(() => {});
+  }
+  function moveDate(offset: number) {
+    const next = new Date(date);
+    next.setDate(next.getDate() + offset);
+    setDate(next);
+  }
+
+  return (
+    <SafeAreaView style={styles.safe}>
+      <StatusBar style="light" />
+      <View style={styles.header}>
+        <View style={styles.headerInner}>
+          <View style={styles.brand}><View style={styles.badge}><Image source={require('../../assets/club-crest.jpg')} style={styles.crest} resizeMode="contain" accessibilityLabel="Escudo del Inter Playa Honda" /></View><View style={styles.brandCopy}><Text style={styles.eyebrow}>ÁREA DE ENTRENADORES</Text><Text style={styles.club}>Inter Playa Honda</Text></View></View>
+          <View style={styles.demoPill}><Text style={styles.demoText}>{repository.demo ? 'DEMOSTRACIÓN' : 'ACCESO DEL CLUB'}</Text></View>
+          <Pressable accessibilityRole="button" disabled={saving} onPress={() => { void onLeave().catch(() => setError('No se pudo cerrar la sesión. Inténtalo de nuevo.')); }} style={styles.exit}><Text style={styles.demoText}>{repository.demo ? 'Salir de la demo' : 'Cerrar sesión'}</Text></Pressable>
+        </View>
+      </View>
+      <ScrollView contentContainerStyle={styles.content}>
+        {teams.length > 1 && <View style={styles.teamChoices}>{teams.map(item => <Pressable key={item.id} accessibilityRole="button" accessibilityState={{ selected: item.id === team.id }} disabled={saving} onPress={() => router.setParams({ team: item.id })} style={styles.teamChoice}><Text style={styles.today}>{item.name}</Text></Pressable>)}</View>}
+        <Text style={styles.kicker}>TU EQUIPO · INTER PLAYA HONDA</Text>
+        <Text style={styles.title}>Cada jugador cuenta.</Text>
+        <Text style={styles.subtitle}>El día a día del equipo, en un mismo lugar.</Text>
+        <View style={styles.teamCard}><View><Text style={styles.teamName}>{team.name}</Text><Text style={styles.muted}>{activePlayers.length} jugadores activos{repository.demo ? ' · Datos ficticios' : ''}</Text></View><Text style={styles.ball}>⚽</Text></View>
+        <View style={styles.tabs}>
+          {([{ id: 'attendance', label: 'Pasar lista' }, { id: 'team', label: 'Plantilla' }] as const).map(item => (
+            <Pressable key={item.id} accessibilityRole="tab" accessibilityState={{ selected: tab === item.id }} disabled={saving} onPress={() => router.setParams({ view: item.id })} style={[styles.tab, tab === item.id && styles.tabActive]}><Text style={[styles.tabText, tab === item.id && styles.tabTextActive]}>{item.label}</Text></Pressable>
+          ))}
+        </View>
+        {!!error && <View style={styles.error}><Text accessibilityRole="alert">{error}</Text></View>}
+        {tab === 'attendance' ? <>
+          <View style={styles.sectionHeading}><Text style={styles.sectionTitle}>Asistencia al entrenamiento</Text><Text style={styles.small}>REGISTRO DIARIO</Text></View>
+          <View style={styles.dateBar}>
+            <Pressable accessibilityRole="button" accessibilityLabel="Día anterior" style={styles.arrow} disabled={saving} onPress={() => moveDate(-1)}><Text style={styles.arrowText}>‹</Text></Pressable>
+            <View style={styles.dateCenter}><Text style={styles.dateText}>{date.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}</Text><Pressable accessibilityRole="button" disabled={saving} onPress={() => setDate(new Date())}><Text style={styles.today}>{key === dateKey(new Date()) ? 'Hoy' : 'Volver a hoy'} · {date.getFullYear()}</Text></Pressable></View>
+            <Pressable accessibilityRole="button" accessibilityLabel="Día siguiente" style={styles.arrow} disabled={saving} onPress={() => moveDate(1)}><Text style={styles.arrowText}>›</Text></Pressable>
+          </View>
+          {loading ? <ActivityIndicator style={styles.loader} color="#176BA0" accessibilityLabel="Cargando asistencia" /> : loadError ? <View style={styles.error}><Text>No se pudo cargar el equipo. No se han sobrescrito los datos.</Text><Pressable accessibilityRole="button" onPress={() => { setLoading(true); void load(); }}><Text style={styles.today}>Reintentar</Text></Pressable></View> : <>
+            <View style={styles.stats}>{[{ label: 'Presentes', count: counts.present, color: '#176BA0' }, { label: 'Ausentes', count: counts.absent, color: '#A52D38' }, { label: 'Justificados', count: counts.excused, color: '#855A0D' }].map(stat => <View key={stat.label} style={styles.stat}><Text style={[styles.statNumber, { color: stat.color }]}>{stat.count}</Text><Text style={styles.statLabel}>{stat.label}</Text></View>)}</View>
+            <View style={styles.listHeading}><Text style={styles.muted}>{counts.pending ? `${counts.pending} pendientes de marcar` : 'Lista completada'}</Text><Text accessibilityLiveRegion="polite" style={styles.small}>{saving ? 'Guardando…' : error ? 'Revisa el aviso' : repository.demo ? 'Guardado local' : 'Datos del servidor'}</Text></View>
+            <View style={styles.list}>{attendancePlayers.map(player => <View key={player.id} style={styles.playerRow}>
+              <View style={styles.playerIdentity}><View style={styles.number}><Text style={styles.numberText}>{player.number}</Text></View><View><Text style={styles.playerName}>{player.name}</Text><Text style={styles.playerStatus}>{player.archivedAt ? 'Archivado · registro histórico' : options.find(option => option.value === day[player.id])?.label ?? 'Sin marcar'}</Text></View></View>
+              <View style={styles.choices}>{options.map(option => { const selected = day[player.id] === option.value; return <Pressable key={option.value} accessibilityRole="button" accessibilityLabel={`${player.name}: ${option.label}`} accessibilityState={{ selected }} disabled={saving || !!player.archivedAt} onPress={() => { void mark(player.id, option.value).catch(() => {}); }} style={[styles.choice, selected && { backgroundColor: option.bg, borderColor: option.color }]}><Text style={[styles.choiceText, selected && { color: option.color, fontWeight: '800' }]}>{option.short}</Text></Pressable>; })}</View>
+            </View>)}</View>
+          </>}
+        </> : <>
+          <Text style={styles.sectionTitle}>Plantilla del equipo</Text><Text style={styles.rosterDescription}>{repository.demo ? 'Usa solo nombres ficticios para probar.' : 'Añade jugadores y mantén al día el equipo.'} Archivar conserva las asistencias anteriores.</Text>
+          {loading ? <ActivityIndicator accessibilityLabel="Cargando plantilla" /> : loadError ? <View style={styles.error}><Text>No se pudo cargar la plantilla.</Text><Pressable accessibilityRole="button" onPress={() => { setLoading(true); void load(); }}><Text style={styles.today}>Reintentar</Text></Pressable></View> : <>
+            <Pressable accessibilityRole="button" style={styles.primary} disabled={saving} onPress={() => setEditor({})}><Text style={styles.primaryText}>Añadir jugador</Text></Pressable>
+            {activePlayers.length === 0 && <Text style={styles.rosterDescription}>Todavía no hay jugadores activos. Añade el primero.</Text>}
+            <View style={styles.list}>{activePlayers.map(player => <View key={player.id} style={styles.playerRow}><View style={styles.playerIdentity}><View style={styles.number}><Text style={styles.numberText}>{player.number}</Text></View><Text style={styles.playerName}>{player.name}</Text></View><View style={styles.actions}>
+              <Pressable accessibilityRole="button" accessibilityLabel={`Editar a ${player.name}`} style={styles.action} disabled={saving} onPress={() => setEditor({ player })}><Text style={styles.today}>Editar</Text></Pressable>
+              <Pressable accessibilityRole="button" accessibilityLabel={`Archivar a ${player.name}`} style={styles.action} disabled={saving} onPress={() => archive(player, true)}><Text style={styles.today}>Archivar</Text></Pressable>
+            </View></View>)}</View>
+            <Pressable accessibilityRole="button" accessibilityState={{ expanded: showArchived }} onPress={() => setShowArchived(value => !value)} style={styles.action}><Text style={styles.today}>{showArchived ? 'Ocultar' : 'Ver'} archivados ({archivedPlayers.length})</Text></Pressable>
+            {showArchived && <View style={styles.list}>{archivedPlayers.map(player => <View key={player.id} style={styles.playerRow}><Text style={styles.playerName}>{player.name} · #{player.number}</Text><Pressable accessibilityRole="button" accessibilityLabel={`Restaurar a ${player.name}`} disabled={saving} style={styles.action} onPress={() => archive(player, false)}><Text style={styles.today}>Restaurar jugador</Text></Pressable></View>)}</View>}
+          </>}
+        </>}
+        <View style={styles.next}><Text style={styles.nextTitle}>Lo siguiente, juntos</Text><Text style={styles.nextText}>Resumen individual de asistencia, minutos de partidos y una biblioteca de ejercicios compartida por todo el club.</Text></View>
+        <Text style={styles.footer}>{repository.demo ? 'Demo con datos ficticios. Los cambios se guardan solo en este dispositivo.' : 'Acceso privado del club. Los cambios se guardan en el servidor; hace falta conexión.'}</Text>
+      </ScrollView>
+      {editor && <PlayerEditor key={editor.player?.id ?? 'new'} player={editor.player} roster={roster} busy={saving} onSave={savePlayer} onClose={() => setEditor(null)} />}
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  primary: { minHeight: 48, backgroundColor: '#176BA0', borderRadius: 8, alignItems: 'center', justifyContent: 'center', marginBottom: 16 }, primaryText: { color: '#FFF', fontWeight: '700' },
+  actions: { flexDirection: 'row', gap: 12 }, action: { minHeight: 44, paddingHorizontal: 12, justifyContent: 'center' },
+  exit: { alignSelf: 'flex-start', paddingVertical: 8 }, teamChoices: { gap: 8, marginBottom: 16 }, teamChoice: { borderWidth: 1, borderColor: '#DAE2EB', borderRadius: 8, padding: 4 },
+  safe: { flex: 1, backgroundColor: '#F4F6F9' },
+  header: { backgroundColor: '#10151D', paddingHorizontal: 20, paddingTop: 22, paddingBottom: 24 },
+  headerInner: { width: '100%', maxWidth: 760, alignSelf: 'center', gap: 16 },
+  brand: { flexDirection: 'row', gap: 12, alignItems: 'center' },
+  badge: { width: 64, height: 64, backgroundColor: '#FFFFFF', borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  crest: { width: 56, height: 56 },
+  brandCopy: { flex: 1 },
+  eyebrow: { color: '#AAC3D7', fontSize: 10, fontWeight: '700', letterSpacing: 1.5 },
+  club: { color: '#FFFFFF', fontSize: 23, fontWeight: '800', marginTop: 4 },
+  demoPill: { alignSelf: 'flex-start', backgroundColor: '#15344F', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 6 },
+  demoText: { color: '#C5E8FF', fontSize: 10, letterSpacing: 1.3, fontWeight: '700' },
+  content: { width: '100%', maxWidth: 800, alignSelf: 'center', padding: 20, paddingBottom: 40 },
+  kicker: { fontSize: 10, letterSpacing: 1.3, color: '#416985', fontWeight: '700', marginTop: 8 },
+  title: { fontSize: 30, lineHeight: 37, color: '#111820', fontWeight: '800', marginTop: 10 },
+  subtitle: { fontSize: 15, color: '#637282', lineHeight: 23, marginTop: 6 },
+  teamCard: { padding: 20, backgroundColor: '#FFF', borderRadius: 16, marginVertical: 24, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderWidth: 1, borderColor: '#DFE5EC' },
+  teamName: { color: '#17212D', fontSize: 18, fontWeight: '700', marginBottom: 7 },
+  muted: { color: '#5D6D7E', fontSize: 12 }, ball: { fontSize: 28 },
+  tabs: { flexDirection: 'row', borderBottomWidth: 1, borderColor: '#D7E0EA', marginBottom: 25 },
+  tab: { paddingHorizontal: 18, paddingBottom: 13, paddingTop: 5, borderBottomWidth: 3, borderColor: 'transparent' },
+  tabActive: { borderColor: '#176BA0' }, tabText: { fontSize: 15, fontWeight: '600', color: '#607184' }, tabTextActive: { color: '#176BA0' },
+  sectionHeading: { gap: 8, marginBottom: 16 }, sectionTitle: { fontSize: 19, fontWeight: '700', color: '#17212D' },
+  small: { fontSize: 10, color: '#61758A', fontWeight: '600', letterSpacing: 0.5 },
+  dateBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#E5EFF8', borderRadius: 12, padding: 5, marginBottom: 16 },
+  arrow: { width: 44, minHeight: 48, alignItems: 'center', justifyContent: 'center' }, arrowText: { fontSize: 30, color: '#176BA0' },
+  dateCenter: { flex: 1, alignItems: 'center' }, dateText: { fontSize: 13, fontWeight: '700', color: '#17212D', textAlign: 'center' }, today: { color: '#176BA0', fontSize: 12, paddingVertical: 8, fontWeight: '600' },
+  stats: { flexDirection: 'row', gap: 8, marginBottom: 22 }, stat: { flex: 1, backgroundColor: '#FFF', borderRadius: 12, paddingVertical: 14, alignItems: 'center' }, statNumber: { fontSize: 26, fontWeight: '800' }, statLabel: { color: '#5D6D7E', fontSize: 10, marginTop: 5 },
+  listHeading: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 6, marginBottom: 12 },
+  list: { backgroundColor: '#FFF', borderRadius: 14, overflow: 'hidden', borderWidth: 1, borderColor: '#DFE5EC' },
+  playerRow: { padding: 12, borderBottomWidth: 1, borderColor: '#EDF1F6', gap: 12 },
+  playerIdentity: { flexDirection: 'row', alignItems: 'center', gap: 12 }, number: { width: 36, height: 36, borderRadius: 10, backgroundColor: '#EBF2F9', justifyContent: 'center', alignItems: 'center' }, numberText: { color: '#176BA0', fontWeight: '700', fontSize: 14 },
+  playerName: { fontSize: 15, fontWeight: '600', color: '#17212D' }, playerStatus: { color: '#65788B', fontSize: 11, marginTop: 3 },
+  choices: { flexDirection: 'row', gap: 8 }, choice: { flex: 1, minHeight: 44, borderWidth: 1, borderColor: '#DAE2EB', borderRadius: 8, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F9FBFD' }, choiceText: { color: '#5D6D7E', fontSize: 12 },
+  next: { padding: 20, borderRadius: 14, backgroundColor: '#E5EFF8', marginTop: 26 }, nextTitle: { fontSize: 14, fontWeight: '700', color: '#17212D', marginBottom: 7 }, nextText: { fontSize: 13, lineHeight: 21, color: '#4F6880' },
+  footer: { color: '#607184', fontSize: 11, lineHeight: 18, textAlign: 'center', marginTop: 22 }, rosterDescription: { color: '#5D6D7E', fontSize: 13, marginTop: 8, marginBottom: 18 },
+  loader: { padding: 40 }, error: { backgroundColor: '#FDE9EB', padding: 16, borderRadius: 10, marginBottom: 12 },
+});

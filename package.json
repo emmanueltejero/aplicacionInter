@@ -1,0 +1,42 @@
+{
+  "name": "aplicacioninter",
+  "version": "1.0.0",
+  "main": "index.ts",
+  "dependencies": {
+    "@expo/metro-runtime": "~58.0.17",
+    "@react-native-async-storage/async-storage": "^2.2.0",
+    "@supabase/supabase-js": "^2.119.0",
+    "expo": "~58.0.23",
+    "expo-constants": "~58.0.15",
+    "expo-linking": "~58.0.16",
+    "expo-router": "~58.0.30",
+    "expo-status-bar": "~58.0.4",
+    "react": "19.3.0",
+    "react-dom": "^19.3.0",
+    "react-native": "0.88.1",
+    "react-native-safe-area-context": "~5.11.1",
+    "react-native-screens": "~4.30.1",
+    "react-native-web": "^0.21.4"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.15",
+    "@types/react": "~19.3.0",
+    "eslint": "^9.0.0",
+    "eslint-config-expo": "~58.0.4",
+    "typescript": "~6.0.3"
+  },
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web",
+    "typecheck": "tsc --noEmit",
+    "test": "node tests/domain.test.mjs && node tests/database.test.mjs",
+    "build": "expo export --platform all",
+    "lint": "eslint .",
+    "demo:build": "node scripts/build-portable-demo.mjs",
+    "access:build": "node --env-file-if-exists=.env.local scripts/build-access-check.mjs",
+    "build:pages": "node --env-file-if-exists=.env.local scripts/build-pages.mjs"
+  },
+  "private": true
+}

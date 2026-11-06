@@ -1,0 +1,52 @@
+name: Publicar web del club
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    env:
+      # Public client configuration, deliberately included in the browser bundle.
+      # Never replace the Publishable key with a secret/service_role credential.
+      EXPO_PUBLIC_SUPABASE_URL: https://corcjvflavfpvzgyvpyb.supabase.co
+      EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_9h_0AT5og9GFUWNY7GsSUQ_RKmbPNnv
+      EXPO_BASE_PATH: /aplicacionInter
+      EXPO_OFFLINE: '1'
+    steps:
+      - name: Descargar código
+        uses: actions/checkout@v4
+      - name: Preparar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Instalar dependencias
+        run: npm ci --no-audit --no-fund
+      - name: Comprobar código y permisos
+        run: npm run typecheck && npm run lint && npm test
+      - name: Generar web
+        run: npm run build:pages
+      - name: Preparar GitHub Pages
+        uses: actions/configure-pages@v5
+      - name: Subir web al despliegue
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+      - name: Publicar web
+        id: deployment
+        uses: actions/deploy-pages@v5
