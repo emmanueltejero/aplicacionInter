@@ -79,3 +79,8 @@ export function parseRoster(value: string | null): Player[] {
 export function initialReportFilters(today = new Date()) {
   return { from: dateKey(new Date(today.getFullYear(), today.getMonth(), 1)), to: dateKey(today), includeArchived: true };
 }
+
+export function formatDateInput(value: string) {
+  const digits = value.replace(/\D/g, '').slice(0, 8);
+  return [digits.slice(0, 4), digits.slice(4, 6), digits.slice(6, 8)].filter(Boolean).join('-');
+}

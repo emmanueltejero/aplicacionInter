@@ -1,14 +1,10 @@
 import { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import type { Player, Register } from '../domain';
-import { dateKey, initialReportFilters } from '../domain';
+import { dateKey, formatDateInput, initialReportFilters } from '../domain';
 import { attendanceReport } from '../attendanceReport';
 import type { ReportFilters } from '../attendanceReport';
 
-function formatDateInput(value: string) {
-  const digits = value.replace(/\D/g, '').slice(0, 8);
-  return [digits.slice(0, 4), digits.slice(4, 6), digits.slice(6, 8)].filter(Boolean).join('-');
-}
 export function AttendanceReport({ roster, register, filters, onChange }: {
   roster: Player[]; register: Register; filters: ReportFilters; onChange: (filters: ReportFilters) => void;
 }) {

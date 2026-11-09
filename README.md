@@ -92,3 +92,11 @@ La pestaña **Resumen** usa únicamente los datos del equipo que ya ha autorizad
 El porcentaje es `presentes / (presentes + ausentes + justificadas) × 100`, sobre los registros completados de cada jugador. Las justificadas cuentan como no asistidas; las fechas futuras y los días sin marcar no entran en el cálculo. No se infieren ausencias a partir del calendario ni de las marcas de otros jugadores. Por eso el porcentaje refleja los datos completados, no una tasa definitiva sobre sesiones pendientes. Un jugador sin registros muestra **Sin datos**, que es distinto de una asistencia registrada del 0%. Se muestran también el número de registros y la explicación del cálculo. Actualmente hay una lista por equipo y día.
 
 `tests/attendance-report.test.mjs` verifica límites de fechas, fechas inválidas, futuros, porcentajes fraccionarios, períodos vacíos, jugadores sin marcar y conservación del historial archivado. La UI se comprobó en navegador con datos ficticios, incluidos filtros y actualización después de pasar lista.
+
+## Partidos y minutos
+
+La pestaña **Partidos** incluye fecha, rival, local/visitante, duración propia, convocatoria y minutos por jugador. Permite crear y editar, y consultar totales por fechas con jugadores archivados. El estado **Partido disputado** controla qué encuentros se contabilizan; las fechas futuras se excluyen siempre. Un `0` es distinto de un campo pendiente.
+
+Para usarlo con las cuentas reales, aplica una vez la [ampliación SQL de partidos](supabase/migrations/202611090002_matches.sql), siguiendo [la guía de Supabase](supabase/README.md#activar-partidos-y-minutos). La demo funciona con almacenamiento local sin ejecutar SQL. El resto de funciones de la cuenta no depende de que esta ampliación esté activada.
+
+Se han probado el flujo de UI y la integración RPC con datos simulados, así como los permisos y las operaciones atómicas en PostgreSQL local. La activación y el guardado real en Supabase requieren la aplicación de la ampliación por el propietario del proyecto.

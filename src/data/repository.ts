@@ -2,11 +2,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { parseRegister, parseRoster, validatePlayer } from '../domain';
 import type { Attendance, Player, Register } from '../domain';
+import { demoMatchesRepository, remoteMatchesRepository } from './matchesRepository';
+import type { MatchesRepository } from './matchesRepository';
 
 export type Team = { id: string; name: string };
 export type TeamData = { roster: Player[]; register: Register };
 export interface ClubRepository {
   readonly demo: boolean;
+  readonly matches: MatchesRepository;
   teams(): Promise<Team[]>;
   load(teamId: string): Promise<TeamData>;
   savePlayer(teamId: string, data: { name: string; number: number }, id?: string): Promise<Player>;
@@ -22,6 +25,7 @@ function requireDemoTeam(teamId: string) {
 
 export const demoRepository: ClubRepository = {
   demo: true,
+  matches: demoMatchesRepository,
   async teams() { return [{ id: DEMO_TEAM, name: 'Equipo de prueba' }]; },
   async load(teamId) {
     requireDemoTeam(teamId);
@@ -74,6 +78,7 @@ async function allRows<Row>(page: (start: number, end: number) => PromiseLike<{ 
 export function remoteRepository(client: SupabaseClient): ClubRepository {
   return {
     demo: false,
+    matches: remoteMatchesRepository(client),
     async teams() {
       const { data, error } = await client.from('teams').select('id,name').order('name');
       check(error); return data ?? [];

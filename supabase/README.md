@@ -62,3 +62,15 @@ Desde la web, el usuario pulsa **He olvidado mi contraseña**, escribe su correo
 El enlace verifica la sesión mediante el SDK de Supabase y abre el formulario de contraseña nueva. La contraseña se envía únicamente al proyecto de Supabase. El formulario requiere al menos 8 caracteres y confirmación idéntica; el servidor puede imponer requisitos adicionales. Tras guardarla, el usuario entra a su equipo. La sesión de recuperación se puede cancelar; los enlaces caducados o erróneos no permiten cambiar la contraseña de una sesión anterior. El formulario conserva el modo de recuperación al recargar y elimina los datos temporales del enlace del estado de navegación.
 
 Nunca se comparten contraseñas ni enlaces de recuperación por el chat o el repositorio. Las pruebas del flujo utilizan contraseñas, tokens y respuestas ficticios; la entrega del correo y el cambio de contraseña reales requieren que el usuario actúe desde su navegador.
+
+## Activar partidos y minutos
+
+Sobre la base de datos existente, ejecuta una sola vez en **SQL Editor → New query** el archivo `migrations/202611090002_matches.sql`. Es una ampliación distinta de la migración inicial: crea únicamente `matches`, `match_players`, sus políticas y la función `save_match`. La operación está en una transacción y no modifica la asistencia ni las plantillas.
+
+Las tablas de partidos solo admiten lectura de los equipos autorizados. Toda escritura desde la aplicación pasa por `save_match`, que verifica la pertenencia al equipo y guarda metadatos, convocatoria y minutos juntos. Valida duración de 1 a 240 minutos, participantes del mismo equipo, ausencia de duplicados, minutos entre 0 y duración y que un partido futuro no se marque como disputado. Los jugadores archivados solo pueden conservar una participación que ya existía. El cliente utiliza un UUID estable para que reintentar un guardado no cree otro partido.
+
+Mientras no se aplique la ampliación, la pestaña Partidos muestra las instrucciones de activación; la plantilla y la asistencia siguen disponibles. Tras ejecutar el SQL, pulsa **Reintentar carga** en esa pestaña. Si indica que una tabla ya existe, no elimines datos: comprueba primero si la ampliación ya se ejecutó.
+
+Un campo de minutos vacío significa pendiente; `0` indica convocado sin jugar. Los totales solo incluyen partidos marcados como disputados, no futuros y dentro de las fechas elegidas. Se muestran convocatorias, participaciones con minutos positivos, minutos conocidos y registros pendientes. Los minutos guardados de partidos que vuelven a marcarse pendientes se conservan, pero no se suman hasta que vuelvan a estar disputados.
+
+Las pruebas locales ejecutan ambas migraciones en PGlite y comprueban permisos, rechazo de escrituras directas, reintentos, validaciones y conservación del historial. La entrega real requiere aplicar esta ampliación en el proyecto remoto y probar un guardado desde una cuenta del club. La clave pública no permite ejecutar migraciones; no se solicita una clave privilegiada para este paso.

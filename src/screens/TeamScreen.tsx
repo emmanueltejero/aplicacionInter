@@ -7,6 +7,7 @@ import { Attendance, dateKey, initialReportFilters, Player, Register, summary } 
 import { ClubRepository, Team } from '../data/repository';
 import { PlayerEditor } from '../components/PlayerEditor';
 import { AttendanceReport } from '../components/AttendanceReport';
+import { MatchesPanel } from '../components/MatchesPanel';
 
 const options: { value: Attendance; label: string; short: string; color: string; bg: string }[] = [
   { value: 'present', label: 'Presente', short: 'Sí', color: '#176BA0', bg: '#DEEEFB' },
@@ -18,7 +19,7 @@ export default function TeamScreen({ team, teams, repository, onLeave }: {
   team: Team; teams: Team[]; repository: ClubRepository; onLeave: () => Promise<void>;
 }) {
   const { view } = useLocalSearchParams<{ view?: string }>();
-  const tab = view === 'team' ? 'team' : view === 'summary' ? 'summary' : 'attendance';
+  const tab = view === 'team' ? 'team' : view === 'summary' ? 'summary' : view === 'matches' ? 'matches' : 'attendance';
   const [date, setDate] = useState(() => new Date());
   const [register, setRegister] = useState<Register>({});
   const [roster, setRoster] = useState<Player[]>([]);
@@ -98,7 +99,7 @@ export default function TeamScreen({ team, teams, repository, onLeave }: {
         <Text style={styles.subtitle}>El día a día del equipo, en un mismo lugar.</Text>
         <View style={styles.teamCard}><View><Text style={styles.teamName}>{team.name}</Text><Text style={styles.muted}>{activePlayers.length} jugadores activos{repository.demo ? ' · Datos ficticios' : ''}</Text></View><Text style={styles.ball}>⚽</Text></View>
         <View style={styles.tabs}>
-          {([{ id: 'attendance', label: 'Pasar lista' }, { id: 'team', label: 'Plantilla' }, { id: 'summary', label: 'Resumen' }] as const).map(item => (
+          {([{ id: 'attendance', label: 'Pasar lista' }, { id: 'team', label: 'Plantilla' }, { id: 'summary', label: 'Resumen' }, { id: 'matches', label: 'Partidos' }] as const).map(item => (
             <Pressable key={item.id} accessibilityRole="tab" accessibilityState={{ selected: tab === item.id }} disabled={saving} onPress={() => router.setParams({ view: item.id })} style={[styles.tab, tab === item.id && styles.tabActive]}><Text style={[styles.tabText, tab === item.id && styles.tabTextActive]}>{item.label}</Text></Pressable>
           ))}
         </View>
@@ -118,6 +119,8 @@ export default function TeamScreen({ team, teams, repository, onLeave }: {
               <View style={styles.choices}>{options.map(option => { const selected = day[player.id] === option.value; return <Pressable key={option.value} accessibilityRole="button" accessibilityLabel={`${player.name}: ${option.label}`} accessibilityState={{ selected }} disabled={saving || !!player.archivedAt} onPress={() => { void mark(player.id, option.value).catch(() => {}); }} style={[styles.choice, selected && { backgroundColor: option.bg, borderColor: option.color }]}><Text style={[styles.choiceText, selected && { color: option.color, fontWeight: '800' }]}>{option.short}</Text></Pressable>; })}</View>
             </View>)}</View>
           </>}
+        </> : tab === 'matches' ? <>
+          {loading ? <ActivityIndicator accessibilityLabel="Cargando equipo" /> : loadError ? <View style={styles.error}><Text>No se pudo cargar la plantilla.</Text><Pressable accessibilityRole="button" onPress={() => { setLoading(true); void load(); }}><Text style={styles.today}>Reintentar</Text></Pressable></View> : <MatchesPanel teamId={team.id} roster={roster} repository={repository.matches} />}
         </> : tab === 'summary' ? <>
           {loading ? <ActivityIndicator accessibilityLabel="Cargando resumen" /> : loadError ? <View style={styles.error}><Text>No se pudo cargar el resumen.</Text><Pressable accessibilityRole="button" onPress={() => { setLoading(true); void load(); }}><Text style={styles.today}>Reintentar</Text></Pressable></View> : <AttendanceReport roster={roster} register={register} filters={reportFilters} onChange={setReportFilters} />}
         </> : <>
@@ -133,7 +136,7 @@ export default function TeamScreen({ team, teams, repository, onLeave }: {
             {showArchived && <View style={styles.list}>{archivedPlayers.map(player => <View key={player.id} style={styles.playerRow}><Text style={styles.playerName}>{player.name} · #{player.number}</Text><Pressable accessibilityRole="button" accessibilityLabel={`Restaurar a ${player.name}`} disabled={saving} style={styles.action} onPress={() => archive(player, false)}><Text style={styles.today}>Restaurar jugador</Text></Pressable></View>)}</View>}
           </>}
         </>}
-        <View style={styles.next}><Text style={styles.nextTitle}>Lo siguiente, juntos</Text><Text style={styles.nextText}>Minutos de partidos y una biblioteca de ejercicios compartida por todo el club.</Text></View>
+        <View style={styles.next}><Text style={styles.nextTitle}>Lo siguiente, juntos</Text><Text style={styles.nextText}>Biblioteca de ejercicios compartida y planificación de entrenamientos.</Text></View>
         <Text style={styles.footer}>{repository.demo ? 'Demo con datos ficticios. Los cambios se guardan solo en este dispositivo.' : 'Acceso privado del club. Los cambios se guardan en el servidor; hace falta conexión.'}</Text>
       </ScrollView>
       {editor && <PlayerEditor key={editor.player?.id ?? 'new'} player={editor.player} roster={roster} busy={saving} onSave={savePlayer} onClose={() => setEditor(null)} />}
