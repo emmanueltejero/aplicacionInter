@@ -24,7 +24,7 @@ test('totals include only played, non-future matches in the inclusive range',()=
  const match=validateMatch(draft,roster,undefined,today);
  const matches=[match,{...match,id:'second',date:'2026-11-02',players:[{playerId:'a',minutes:0},{playerId:'b',minutes:20}]},{...match,id:'future',date:'2026-12-01'},{...match,id:'planned',played:false},{...match,id:'old',date:'2026-10-31'}];
  const total=matchTotals(roster,matches,'2026-11-01','2026-11-30',today);
- assert.equal(total.matches,2);assert.deepEqual(total.rows[0],{player:roster[0],called:2,played:1,minutes:60,pending:0});assert.equal(total.rows[1].pending,1);assert.equal(total.rows[1].minutes,20);
+ assert.equal(total.matches,2);assert.deepEqual(total.rows[0],{player:roster[0],called:2,played:1,minutes:60,pending:0,average:60});assert.equal(total.rows[1].pending,1);assert.equal(total.rows[1].minutes,20);
  assert.throws(()=>matchTotals(roster,matches,'2026-11-09','2026-11-01',today));
 });
 test('stored match validation rejects corrupt and duplicate data, preserves empty state',()=>{
@@ -32,4 +32,13 @@ test('stored match validation rejects corrupt and duplicate data, preserves empt
  assert.deepEqual(parseMatches(null),[]);assert.deepEqual(parseMatches('[]'),[]);assert.deepEqual(parseMatches(JSON.stringify([match])),[match]);
  for(const value of ['null',JSON.stringify([match,match]),JSON.stringify([{...match,players:[{playerId:'a',minutes:61}]}]),JSON.stringify([{...match,players:[{playerId:'a',minutes:0},{playerId:'a',minutes:1}]}])])assert.throws(()=>parseMatches(value));
  assert.match(newMatchId(),/^[0-9a-f-]{36}$/i);
+});
+
+test('average divides recorded minutes by actual appearances, excluding bench, pending, planned and future games',()=>{
+ const base=validateMatch(draft,roster,undefined,today);
+ const games=[{...base,players:[{playerId:'a',minutes:60}]},{...base,id:'two',players:[{playerId:'a',minutes:30}]},{...base,id:'bench',players:[{playerId:'a',minutes:0}]},{...base,id:'pending',players:[{playerId:'a',minutes:null}]},{...base,id:'planned',played:false,players:[{playerId:'a',minutes:60}]},{...base,id:'future',date:'2026-12-01',players:[{playerId:'a',minutes:60}]}];
+ const result=matchTotals(roster,games,'','',today);
+ assert.equal(result.rows[0].minutes,90);assert.equal(result.rows[0].played,2);assert.equal(result.rows[0].average,45);assert.equal(result.rows[0].pending,1);assert.equal(result.rows[0].called,4);
+ assert.equal(result.rows[1].average,null);
+ const bench=matchTotals(roster,[{...base,players:[{playerId:'a',minutes:0}]}],'','',today);assert.equal(bench.rows[0].average,null);
 });

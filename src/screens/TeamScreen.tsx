@@ -6,7 +6,7 @@ import { StatusBar } from 'expo-status-bar';
 import { Attendance, dateKey, initialReportFilters, Player, Register, summary } from '../domain';
 import { ClubRepository, Team } from '../data/repository';
 import { PlayerEditor } from '../components/PlayerEditor';
-import { AttendanceReport } from '../components/AttendanceReport';
+import { PlayerSummary } from '../components/PlayerSummary';
 import { MatchesPanel } from '../components/MatchesPanel';
 
 const options: { value: Attendance; label: string; short: string; color: string; bg: string }[] = [
@@ -122,7 +122,7 @@ export default function TeamScreen({ team, teams, repository, onLeave }: {
         </> : tab === 'matches' ? <>
           {loading ? <ActivityIndicator accessibilityLabel="Cargando equipo" /> : loadError ? <View style={styles.error}><Text>No se pudo cargar la plantilla.</Text><Pressable accessibilityRole="button" onPress={() => { setLoading(true); void load(); }}><Text style={styles.today}>Reintentar</Text></Pressable></View> : <MatchesPanel teamId={team.id} roster={roster} repository={repository.matches} />}
         </> : tab === 'summary' ? <>
-          {loading ? <ActivityIndicator accessibilityLabel="Cargando resumen" /> : loadError ? <View style={styles.error}><Text>No se pudo cargar el resumen.</Text><Pressable accessibilityRole="button" onPress={() => { setLoading(true); void load(); }}><Text style={styles.today}>Reintentar</Text></Pressable></View> : <AttendanceReport roster={roster} register={register} filters={reportFilters} onChange={setReportFilters} />}
+          {loading ? <ActivityIndicator accessibilityLabel="Cargando resumen" /> : loadError ? <View style={styles.error}><Text>No se pudo cargar el resumen.</Text><Pressable accessibilityRole="button" onPress={() => { setLoading(true); void load(); }}><Text style={styles.today}>Reintentar</Text></Pressable></View> : <PlayerSummary teamId={team.id} roster={roster} register={register} filters={reportFilters} onChange={setReportFilters} repository={repository.matches} />}
         </> : <>
           <Text style={styles.sectionTitle}>Plantilla del equipo</Text><Text style={styles.rosterDescription}>{repository.demo ? 'Usa solo nombres ficticios para probar.' : 'Añade jugadores y mantén al día el equipo.'} Archivar conserva las asistencias anteriores.</Text>
           {loading ? <ActivityIndicator accessibilityLabel="Cargando plantilla" /> : loadError ? <View style={styles.error}><Text>No se pudo cargar la plantilla.</Text><Pressable accessibilityRole="button" onPress={() => { setLoading(true); void load(); }}><Text style={styles.today}>Reintentar</Text></Pressable></View> : <>

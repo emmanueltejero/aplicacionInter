@@ -100,3 +100,9 @@ La pestaña **Partidos** incluye fecha, rival, local/visitante, duración propia
 Para usarlo con las cuentas reales, aplica una vez la [ampliación SQL de partidos](supabase/migrations/202611090002_matches.sql), siguiendo [la guía de Supabase](supabase/README.md#activar-partidos-y-minutos). La demo funciona con almacenamiento local sin ejecutar SQL. El resto de funciones de la cuenta no depende de que esta ampliación esté activada.
 
 Se han probado el flujo de UI y la integración RPC con datos simulados, así como los permisos y las operaciones atómicas en PostgreSQL local. La activación y el guardado real en Supabase requieren la aplicación de la ampliación por el propietario del proyecto.
+
+### Partidos dentro de Resumen
+
+Cada ficha de Resumen reúne ahora la asistencia a entrenamientos y los partidos jugados, minutos totales y media de minutos por partido. El mismo intervalo de fechas y filtro de archivados se aplica a ambos bloques. La media usa los minutos conocidos divididos entre los partidos con minutos positivos; las convocatorias con 0 minutos no aumentan el divisor. Si no hay participaciones con minutos registrados, la media muestra un guion. Los registros pendientes se señalan como cifras provisionales y no se convierten en ceros.
+
+Los partidos se vuelven a cargar al entrar en Resumen, por lo que las ediciones de la pestaña Partidos aparecen al regresar. Si la carga falla, se conserva la asistencia visible y se ofrece reintentar los partidos, sin mostrar estadísticas de partidos ficticiamente a cero. Esta mejora utiliza las tablas ya activadas y no requiere otra migración.

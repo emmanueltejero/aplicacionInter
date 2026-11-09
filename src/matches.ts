@@ -64,6 +64,6 @@ export function matchTotals(roster: Player[], matches: Match[], from: string, to
       if (entry.minutes === null) counts.pending++;
       else { counts.minutes += entry.minutes; if (entry.minutes > 0) counts.played++; }
     }
-    return { player, ...counts };
+    return { player, ...counts, average: counts.played ? counts.minutes / counts.played : null };
   }) };
 }
