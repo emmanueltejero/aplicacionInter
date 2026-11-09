@@ -8,6 +8,7 @@ Primera versión de la aplicación del club, creada con React Native, Expo y Typ
 - Equipos asignados al entrenador y gestión de jugadores: alta, edición, archivo y restauración. Archivar conserva las asistencias.
 - Dorsales únicos entre jugadores activos; errores de validación y guardado visibles.
 - Asistencia por fecha con estados presente, ausente o justificado; pendientes separados.
+- Pestaña Resumen con estadísticas individuales, porcentaje, filtro por fechas y consulta de jugadores archivados.
 - Base de datos y políticas RLS en `supabase/`. Consulta [la guía de conexión](supabase/README.md) para crear las tablas, la primera cuenta y las asignaciones.
 - Demo independiente con datos ficticios y persistencia local; no se mezclan sus registros con los del club.
 
@@ -37,7 +38,7 @@ El modo offline de Expo evita consultas auxiliares de metadatos; no desactiva ve
 
 ## Próximas fases acordadas
 
-1. Conectar y validar en el proyecto real las cuentas, equipos y plantillas ya implementados; después, resumen individual de asistencia. Las altas de entrenador se gestionan desde el club.
+1. Conectar y validar en el proyecto real las cuentas, equipos y plantillas ya implementados; después, partidos y minutos jugados. Las altas de entrenador se gestionan desde el club.
 2. Partidos y registro de minutos de cada jugador.
 3. Biblioteca de ejercicios compartida: todos los entrenadores pueden aportar y utilizar ejercicios. Propuesta inicial: cada autor edita sus ejercicios y el administrador gestiona todos.
 4. Planificador de sesiones con categorías, duración, material, jugadores y espacio. Cada sesión conservará una copia del ejercicio para que posteriores ediciones no cambien sesiones existentes. Definir las reglas de recursos para ejercicios simultáneos y consecutivos.
@@ -83,3 +84,11 @@ El directorio `dist/` contiene la web y el escudo; `.nojekyll` permite servir lo
 Antes del primer despliegue, el propietario debe activar **Settings → Pages → Build and deployment → Source: GitHub Actions** en GitHub. Cada subida a `main` activa el flujo de publicación. Si el primer intento falló por Pages deshabilitado, actívalo y repite la ejecución desde Actions o sube un cambio nuevo. Revisar el resultado del flujo y probar el sitio HTTPS real antes de darlo por operativo. Esta versión no tiene todavía manifiesto ni caché offline de PWA.
 
 La publicación del entorno de Codex y la publicación de esta web son operaciones distintas. Los archivos descargables del chat son auxiliares y no se necesitan para usar el sitio alojado.
+
+## Resumen de asistencia
+
+La pestaña **Resumen** usa únicamente los datos del equipo que ya ha autorizado Supabase. No necesita nuevas tablas, migraciones ni permisos. Permite elegir fechas inclusivas, este mes, los últimos 30 días o todo el historial y mostrar/ocultar jugadores archivados. El filtro se conserva al cambiar de pestaña durante la sesión del equipo.
+
+El porcentaje es `presentes / (presentes + ausentes + justificadas) × 100`, sobre los registros completados de cada jugador. Las justificadas cuentan como no asistidas; las fechas futuras y los días sin marcar no entran en el cálculo. No se infieren ausencias a partir del calendario ni de las marcas de otros jugadores. Por eso el porcentaje refleja los datos completados, no una tasa definitiva sobre sesiones pendientes. Un jugador sin registros muestra **Sin datos**, que es distinto de una asistencia registrada del 0%. Se muestran también el número de registros y la explicación del cálculo. Actualmente hay una lista por equipo y día.
+
+`tests/attendance-report.test.mjs` verifica límites de fechas, fechas inválidas, futuros, porcentajes fraccionarios, períodos vacíos, jugadores sin marcar y conservación del historial archivado. La UI se comprobó en navegador con datos ficticios, incluidos filtros y actualización después de pasar lista.

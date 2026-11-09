@@ -75,3 +75,7 @@ export function parseRoster(value: string | null): Player[] {
   }
   return parsed as Player[];
 }
+
+export function initialReportFilters(today = new Date()) {
+  return { from: dateKey(new Date(today.getFullYear(), today.getMonth(), 1)), to: dateKey(today), includeArchived: true };
+}

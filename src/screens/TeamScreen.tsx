@@ -3,9 +3,10 @@ import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { Attendance, dateKey, Player, Register, summary } from '../domain';
+import { Attendance, dateKey, initialReportFilters, Player, Register, summary } from '../domain';
 import { ClubRepository, Team } from '../data/repository';
 import { PlayerEditor } from '../components/PlayerEditor';
+import { AttendanceReport } from '../components/AttendanceReport';
 
 const options: { value: Attendance; label: string; short: string; color: string; bg: string }[] = [
   { value: 'present', label: 'Presente', short: 'Sí', color: '#176BA0', bg: '#DEEEFB' },
@@ -17,7 +18,7 @@ export default function TeamScreen({ team, teams, repository, onLeave }: {
   team: Team; teams: Team[]; repository: ClubRepository; onLeave: () => Promise<void>;
 }) {
   const { view } = useLocalSearchParams<{ view?: string }>();
-  const tab = view === 'team' ? 'team' : 'attendance';
+  const tab = view === 'team' ? 'team' : view === 'summary' ? 'summary' : 'attendance';
   const [date, setDate] = useState(() => new Date());
   const [register, setRegister] = useState<Register>({});
   const [roster, setRoster] = useState<Player[]>([]);
@@ -26,6 +27,7 @@ export default function TeamScreen({ team, teams, repository, onLeave }: {
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [editor, setEditor] = useState<{ player?: Player } | null>(null);
+  const [reportFilters, setReportFilters] = useState(() => initialReportFilters());
   const [showArchived, setShowArchived] = useState(false);
   const locked = useRef(false);
   const key = dateKey(date);
@@ -96,7 +98,7 @@ export default function TeamScreen({ team, teams, repository, onLeave }: {
         <Text style={styles.subtitle}>El día a día del equipo, en un mismo lugar.</Text>
         <View style={styles.teamCard}><View><Text style={styles.teamName}>{team.name}</Text><Text style={styles.muted}>{activePlayers.length} jugadores activos{repository.demo ? ' · Datos ficticios' : ''}</Text></View><Text style={styles.ball}>⚽</Text></View>
         <View style={styles.tabs}>
-          {([{ id: 'attendance', label: 'Pasar lista' }, { id: 'team', label: 'Plantilla' }] as const).map(item => (
+          {([{ id: 'attendance', label: 'Pasar lista' }, { id: 'team', label: 'Plantilla' }, { id: 'summary', label: 'Resumen' }] as const).map(item => (
             <Pressable key={item.id} accessibilityRole="tab" accessibilityState={{ selected: tab === item.id }} disabled={saving} onPress={() => router.setParams({ view: item.id })} style={[styles.tab, tab === item.id && styles.tabActive]}><Text style={[styles.tabText, tab === item.id && styles.tabTextActive]}>{item.label}</Text></Pressable>
           ))}
         </View>
@@ -116,6 +118,8 @@ export default function TeamScreen({ team, teams, repository, onLeave }: {
               <View style={styles.choices}>{options.map(option => { const selected = day[player.id] === option.value; return <Pressable key={option.value} accessibilityRole="button" accessibilityLabel={`${player.name}: ${option.label}`} accessibilityState={{ selected }} disabled={saving || !!player.archivedAt} onPress={() => { void mark(player.id, option.value).catch(() => {}); }} style={[styles.choice, selected && { backgroundColor: option.bg, borderColor: option.color }]}><Text style={[styles.choiceText, selected && { color: option.color, fontWeight: '800' }]}>{option.short}</Text></Pressable>; })}</View>
             </View>)}</View>
           </>}
+        </> : tab === 'summary' ? <>
+          {loading ? <ActivityIndicator accessibilityLabel="Cargando resumen" /> : loadError ? <View style={styles.error}><Text>No se pudo cargar el resumen.</Text><Pressable accessibilityRole="button" onPress={() => { setLoading(true); void load(); }}><Text style={styles.today}>Reintentar</Text></Pressable></View> : <AttendanceReport roster={roster} register={register} filters={reportFilters} onChange={setReportFilters} />}
         </> : <>
           <Text style={styles.sectionTitle}>Plantilla del equipo</Text><Text style={styles.rosterDescription}>{repository.demo ? 'Usa solo nombres ficticios para probar.' : 'Añade jugadores y mantén al día el equipo.'} Archivar conserva las asistencias anteriores.</Text>
           {loading ? <ActivityIndicator accessibilityLabel="Cargando plantilla" /> : loadError ? <View style={styles.error}><Text>No se pudo cargar la plantilla.</Text><Pressable accessibilityRole="button" onPress={() => { setLoading(true); void load(); }}><Text style={styles.today}>Reintentar</Text></Pressable></View> : <>
@@ -129,7 +133,7 @@ export default function TeamScreen({ team, teams, repository, onLeave }: {
             {showArchived && <View style={styles.list}>{archivedPlayers.map(player => <View key={player.id} style={styles.playerRow}><Text style={styles.playerName}>{player.name} · #{player.number}</Text><Pressable accessibilityRole="button" accessibilityLabel={`Restaurar a ${player.name}`} disabled={saving} style={styles.action} onPress={() => archive(player, false)}><Text style={styles.today}>Restaurar jugador</Text></Pressable></View>)}</View>}
           </>}
         </>}
-        <View style={styles.next}><Text style={styles.nextTitle}>Lo siguiente, juntos</Text><Text style={styles.nextText}>Resumen individual de asistencia, minutos de partidos y una biblioteca de ejercicios compartida por todo el club.</Text></View>
+        <View style={styles.next}><Text style={styles.nextTitle}>Lo siguiente, juntos</Text><Text style={styles.nextText}>Minutos de partidos y una biblioteca de ejercicios compartida por todo el club.</Text></View>
         <Text style={styles.footer}>{repository.demo ? 'Demo con datos ficticios. Los cambios se guardan solo en este dispositivo.' : 'Acceso privado del club. Los cambios se guardan en el servidor; hace falta conexión.'}</Text>
       </ScrollView>
       {editor && <PlayerEditor key={editor.player?.id ?? 'new'} player={editor.player} roster={roster} busy={saving} onSave={savePlayer} onClose={() => setEditor(null)} />}
@@ -160,7 +164,7 @@ const styles = StyleSheet.create({
   teamName: { color: '#17212D', fontSize: 18, fontWeight: '700', marginBottom: 7 },
   muted: { color: '#5D6D7E', fontSize: 12 }, ball: { fontSize: 28 },
   tabs: { flexDirection: 'row', borderBottomWidth: 1, borderColor: '#D7E0EA', marginBottom: 25 },
-  tab: { paddingHorizontal: 18, paddingBottom: 13, paddingTop: 5, borderBottomWidth: 3, borderColor: 'transparent' },
+  tab: { flex: 1, minHeight: 48, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6, paddingBottom: 13, paddingTop: 5, borderBottomWidth: 3, borderColor: 'transparent' },
   tabActive: { borderColor: '#176BA0' }, tabText: { fontSize: 15, fontWeight: '600', color: '#607184' }, tabTextActive: { color: '#176BA0' },
   sectionHeading: { gap: 8, marginBottom: 16 }, sectionTitle: { fontSize: 19, fontWeight: '700', color: '#17212D' },
   small: { fontSize: 10, color: '#61758A', fontWeight: '600', letterSpacing: 0.5 },
