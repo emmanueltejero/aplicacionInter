@@ -12,12 +12,15 @@ test('PostgreSQL schema enforces club permissions and preserves history', async 
       create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
       grant usage on schema auth to authenticated, anon;`);
     await db.exec(readFileSync(new URL('../supabase/migrations/202611050001_club.sql', import.meta.url), 'utf8'));
+    const clearAttendance = readFileSync(new URL('../supabase/migrations/202611090003_clear_attendance.sql', import.meta.url), 'utf8');
+    await db.exec(clearAttendance);
     await db.exec(`insert into auth.users values ('${id(1)}'),('${id(2)}'),('${id(3)}'),('${id(4)}'),('${id(5)}');
       insert into public.club_members values ('${id(1)}','admin',true),('${id(2)}','coach',true),('${id(3)}','coach',true),('${id(4)}','coach',false);
       insert into public.teams values ('${id(10)}','Equipo A'),('${id(20)}','Equipo B');
       insert into public.team_coaches values ('${id(10)}','${id(2)}'),('${id(20)}','${id(3)}'),('${id(10)}','${id(4)}');
       insert into public.players(id,team_id,name,number) values ('${id(100)}','${id(10)}','Jugador A',7),('${id(200)}','${id(20)}','Jugador B',7);
       insert into public.attendance values ('${id(10)}','${id(100)}','2026-11-05','present');`);
+    await db.exec(clearAttendance); // Reapplying must preserve populated data and permissions.
     async function asUser(user) {
       await db.exec(`reset role; set role authenticated; select set_config('request.jwt.claim.sub','${id(user)}',false)`);
     }
@@ -65,9 +68,31 @@ test('PostgreSQL schema enforces club permissions and preserves history', async 
         assert.equal((await db.query('select * from public.attendance')).rows.length, 0);
       }
     });
+    await t.test('clearing a mark affects only its player and date and respects team access', async () => {
+      await db.exec(`reset role;
+        insert into public.players(id,team_id,name,number) values ('${id(102)}','${id(10)}','Otro jugador',9);
+        insert into public.attendance values ('${id(10)}','${id(102)}','2026-11-06','present'),('${id(20)}','${id(200)}','2026-11-05','absent');`);
+      for (const user of [3, 4, 5]) {
+        await asUser(user);
+        assert.equal((await db.query(`delete from public.attendance where player_id='${id(100)}' returning player_id`)).rows.length, 0);
+      }
+      await asUser(2);
+      assert.equal((await db.query(`delete from public.attendance where player_id='${id(200)}' returning player_id`)).rows.length, 0);
+      assert.equal((await db.query(`delete from public.attendance where team_id='${id(10)}' and player_id='${id(100)}' and training_date='2026-11-06' returning player_id`)).rows.length, 1);
+      assert.deepEqual((await db.query('select player_id,training_date::text,status from public.attendance order by training_date')).rows, [
+        { player_id: id(100), training_date: '2026-11-05', status: 'present' },
+        { player_id: id(102), training_date: '2026-11-06', status: 'present' },
+      ]);
+      await db.exec(`update public.players set archived_at=now() where id='${id(100)}'`);
+      assert.equal((await db.query(`delete from public.attendance where player_id='${id(100)}' returning player_id`)).rows.length, 0);
+      await asUser(1);
+      assert.equal((await db.query(`delete from public.attendance where player_id='${id(200)}' returning player_id`)).rows.length, 1);
+      await assert.rejects(db.exec(`delete from public.players where id='${id(102)}'`), /permission denied/);
+    });
     await t.test('anonymous users cannot read rosters or call permission helpers', async () => {
       await db.exec('reset role; set role anon;');
       await assert.rejects(db.query('select * from public.players'), /permission denied/);
+      await assert.rejects(db.query('delete from public.attendance'), /permission denied/);
       await assert.rejects(db.query(`select public.can_access_team('${id(10)}')`), /permission denied/);
     });
   } finally { await db.close(); }

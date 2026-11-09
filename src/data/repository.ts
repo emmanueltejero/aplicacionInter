@@ -15,6 +15,7 @@ export interface ClubRepository {
   savePlayer(teamId: string, data: { name: string; number: number }, id?: string): Promise<Player>;
   archivePlayer(teamId: string, id: string, archived: boolean): Promise<Player>;
   mark(teamId: string, date: string, playerId: string, status: Attendance): Promise<void>;
+  clearAttendance(teamId: string, date: string, playerId: string): Promise<void>;
 }
 const DEMO_TEAM = 'demo-team';
 const ROSTER_KEY = '@inter-playa-honda/demo-roster/v1';
@@ -55,6 +56,15 @@ export const demoRepository: ClubRepository = {
     const { roster, register } = await this.load(teamId);
     if (!roster.some(player => player.id === playerId && !player.archivedAt)) throw new Error('Jugador no activo.');
     await AsyncStorage.setItem(ATTENDANCE_KEY, JSON.stringify({ ...register, [date]: { ...register[date], [playerId]: status } }));
+  },
+  async clearAttendance(teamId, date, playerId) {
+    const { roster, register } = await this.load(teamId);
+    if (!roster.some(player => player.id === playerId && !player.archivedAt)) throw new Error('Jugador no activo.');
+    const day = { ...register[date] };
+    delete day[playerId];
+    if (Object.keys(day).length) register[date] = day;
+    else delete register[date];
+    await AsyncStorage.setItem(ATTENDANCE_KEY, JSON.stringify(register));
   },
 };
 
@@ -117,6 +127,13 @@ export function remoteRepository(client: SupabaseClient): ClubRepository {
       const result = await client.from('attendance').update({ status }).eq('team_id', teamId)
         .eq('player_id', playerId).eq('training_date', date).select('player_id').single();
       check(result.error); if (!result.data) throw new Error('No se pudo actualizar la asistencia.');
+    },
+    async clearAttendance(teamId, date, playerId) {
+      const result = await client.from('attendance').delete().eq('team_id', teamId)
+        .eq('player_id', playerId).eq('training_date', date).select('player_id');
+      if (result.error?.code === '42501') throw new Error('El club debe activar la actualización de Supabase para quitar marcas de asistencia. La marca se ha conservado.');
+      check(result.error);
+      if (result.data?.length !== 1) throw new Error('No se pudo quitar la marca. Revisa tus permisos y vuelve a cargar la asistencia.');
     },
   };
 }

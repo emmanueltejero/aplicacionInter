@@ -8,6 +8,7 @@ import { ClubRepository, Team } from '../data/repository';
 import { PlayerEditor } from '../components/PlayerEditor';
 import { PlayerSummary } from '../components/PlayerSummary';
 import { MatchesPanel } from '../components/MatchesPanel';
+import { AttendanceDateSearch } from '../components/AttendanceDateSearch';
 
 const options: { value: Attendance; label: string; short: string; color: string; bg: string }[] = [
   { value: 'present', label: 'Presente', short: 'Sí', color: '#176BA0', bg: '#DEEEFB' },
@@ -111,12 +112,14 @@ export default function TeamScreen({ team, teams, repository, onLeave }: {
             <View style={styles.dateCenter}><Text style={styles.dateText}>{date.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}</Text><Pressable accessibilityRole="button" disabled={saving} onPress={() => setDate(new Date())}><Text style={styles.today}>{key === dateKey(new Date()) ? 'Hoy' : 'Volver a hoy'} · {date.getFullYear()}</Text></Pressable></View>
             <Pressable accessibilityRole="button" accessibilityLabel="Día siguiente" style={styles.arrow} disabled={saving} onPress={() => moveDate(1)}><Text style={styles.arrowText}>›</Text></Pressable>
           </View>
+          <AttendanceDateSearch key={key} date={date} disabled={saving} onSelect={setDate} />
           {loading ? <ActivityIndicator style={styles.loader} color="#176BA0" accessibilityLabel="Cargando asistencia" /> : loadError ? <View style={styles.error}><Text>No se pudo cargar el equipo. No se han sobrescrito los datos.</Text><Pressable accessibilityRole="button" onPress={() => { setLoading(true); void load(); }}><Text style={styles.today}>Reintentar</Text></Pressable></View> : <>
             <View style={styles.stats}>{[{ label: 'Presentes', count: counts.present, color: '#176BA0' }, { label: 'Ausentes', count: counts.absent, color: '#A52D38' }, { label: 'Justificados', count: counts.excused, color: '#855A0D' }].map(stat => <View key={stat.label} style={styles.stat}><Text style={[styles.statNumber, { color: stat.color }]}>{stat.count}</Text><Text style={styles.statLabel}>{stat.label}</Text></View>)}</View>
             <View style={styles.listHeading}><Text style={styles.muted}>{counts.pending ? `${counts.pending} pendientes de marcar` : 'Lista completada'}</Text><Text accessibilityLiveRegion="polite" style={styles.small}>{saving ? 'Guardando…' : error ? 'Revisa el aviso' : repository.demo ? 'Guardado local' : 'Datos del servidor'}</Text></View>
             <View style={styles.list}>{attendancePlayers.map(player => <View key={player.id} style={styles.playerRow}>
               <View style={styles.playerIdentity}><View style={styles.number}><Text style={styles.numberText}>{player.number}</Text></View><View><Text style={styles.playerName}>{player.name}</Text><Text style={styles.playerStatus}>{player.archivedAt ? 'Archivado · registro histórico' : options.find(option => option.value === day[player.id])?.label ?? 'Sin marcar'}</Text></View></View>
               <View style={styles.choices}>{options.map(option => { const selected = day[player.id] === option.value; return <Pressable key={option.value} accessibilityRole="button" accessibilityLabel={`${player.name}: ${option.label}`} accessibilityState={{ selected }} disabled={saving || !!player.archivedAt} onPress={() => { void mark(player.id, option.value).catch(() => {}); }} style={[styles.choice, selected && { backgroundColor: option.bg, borderColor: option.color }]}><Text style={[styles.choiceText, selected && { color: option.color, fontWeight: '800' }]}>{option.short}</Text></Pressable>; })}</View>
+              {!!day[player.id] && !player.archivedAt && <Pressable accessibilityRole="button" accessibilityLabel={`Quitar marca de ${player.name}`} disabled={saving} style={styles.clearMark} onPress={() => { void mutate(() => repository.clearAttendance(team.id, key, player.id)).catch(() => {}); }}><Text style={styles.today}>Quitar marca</Text></Pressable>}
             </View>)}</View>
           </>}
         </> : tab === 'matches' ? <>
@@ -145,6 +148,7 @@ export default function TeamScreen({ team, teams, repository, onLeave }: {
 }
 
 const styles = StyleSheet.create({
+  clearMark: { minHeight: 44, alignSelf: 'flex-end', justifyContent: 'center', paddingHorizontal: 12 },
   primary: { minHeight: 48, backgroundColor: '#176BA0', borderRadius: 8, alignItems: 'center', justifyContent: 'center', marginBottom: 16 }, primaryText: { color: '#FFF', fontWeight: '700' },
   actions: { flexDirection: 'row', gap: 12 }, action: { minHeight: 44, paddingHorizontal: 12, justifyContent: 'center' },
   exit: { alignSelf: 'flex-start', paddingVertical: 8 }, teamChoices: { gap: 8, marginBottom: 16 }, teamChoice: { borderWidth: 1, borderColor: '#DAE2EB', borderRadius: 8, padding: 4 },

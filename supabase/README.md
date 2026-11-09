@@ -6,7 +6,7 @@ Esta carpeta prepara la base de datos y sus permisos. La aplicación no contiene
 
 En el proyecto nuevo, abre **SQL Editor → New query**, pega `migrations/202611050001_club.sql` y ejecuta una sola vez. La migración se ejecuta dentro de una transacción. Si hay tablas previas con estos nombres, investiga el conflicto; no las borres para forzar su ejecución.
 
-Tablas: `club_members`, `teams`, `team_coaches`, `players` y `attendance`. Todos los datos están protegidos por RLS. Un entrenador ve sus equipos; un administrador activo ve todos. Una cuenta sin membresía activa no tiene acceso. No se permiten eliminaciones desde la aplicación ni cambios de equipo/identidad de registros históricos.
+Tablas: `club_members`, `teams`, `team_coaches`, `players` y `attendance`. Todos los datos están protegidos por RLS. Un entrenador ve sus equipos; un administrador activo ve todos. Una cuenta sin membresía activa no tiene acceso. Los jugadores se archivan; no se permite borrarlos ni cambiar los identificadores de registros históricos. Para quitar marcas de asistencia, aplica la ampliación descrita más abajo.
 
 ## 2. Configurar el acceso de la aplicación
 
@@ -49,6 +49,14 @@ Las pruebas locales de `npm test` ejecutan la migración en PostgreSQL mediante 
 Antes de introducir datos reales, verifica en Supabase dos cuentas de entrenadores con equipos distintos: cada una ve solo su equipo, puede añadir/editar/archivar/restaurar jugadores y marcar asistencia, los cambios sobreviven a una nueva sesión, y la otra cuenta no puede consultarlos. Verifica también el cierre de sesión y el comportamiento ante una conexión interrumpida.
 
 La versión portátil HTML sigue siendo una demo local sin autenticación ni conexión a Supabase.
+
+## Activar «Quitar marca» en asistencia
+
+Ejecuta `migrations/202611090003_clear_attendance.sql` en **SQL Editor → New query → Run**. Se puede ejecutar de nuevo y no cambia los datos existentes. Añade permiso de borrado exclusivamente en `attendance` y una política RLS: cada entrenador puede quitar marcas de jugadores activos de sus equipos y los administradores activos de cualquier equipo. Las cuentas anónimas, deshabilitadas o sin asignación no pueden borrar esas marcas. Los jugadores archivados conservan su historial; para corregirlo hay que restaurarlos primero.
+
+En **Pasar lista**, el botón **Quitar marca** elimina únicamente la asistencia del jugador y la fecha seleccionados. El jugador vuelve a **Sin marcar** y ese registro sale de los porcentajes de Resumen; no se convierte en ausencia. Si falta la ampliación o falla el borrado, se conserva la marca y aparece un aviso. No se otorgan permisos para borrar jugadores, equipos ni partidos.
+
+**Buscar asistencia por fecha** permite introducir `AAAA-MM-DD` y pulsar **Ver fecha**. Se comprueba que el día existe antes de cambiar la lista. Las flechas y **Volver a hoy** siguen disponibles. Consultar una fecha no crea registros.
 
 ## Recuperación de contraseña desde la web
 

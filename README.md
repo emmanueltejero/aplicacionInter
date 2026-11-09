@@ -106,3 +106,9 @@ Se han probado el flujo de UI y la integración RPC con datos simulados, así co
 Cada ficha de Resumen reúne ahora la asistencia a entrenamientos y los partidos jugados, minutos totales y media de minutos por partido. El mismo intervalo de fechas y filtro de archivados se aplica a ambos bloques. La media usa los minutos conocidos divididos entre los partidos con minutos positivos; las convocatorias con 0 minutos no aumentan el divisor. Si no hay participaciones con minutos registrados, la media muestra un guion. Los registros pendientes se señalan como cifras provisionales y no se convierten en ceros.
 
 Los partidos se vuelven a cargar al entrar en Resumen, por lo que las ediciones de la pestaña Partidos aparecen al regresar. Si la carga falla, se conserva la asistencia visible y se ofrece reintentar los partidos, sin mostrar estadísticas de partidos ficticiamente a cero. Esta mejora utiliza las tablas ya activadas y no requiere otra migración.
+
+## Corregir y buscar asistencia a entrenamientos
+
+En **Pasar lista**, **Buscar asistencia por fecha → Ver fecha** abre directamente cualquier día válido, conservando las flechas y el acceso a hoy. La consulta no crea registros. **Quitar marca** devuelve al jugador a **Sin marcar**, actualiza los contadores y lo excluye del cálculo del porcentaje de ese día; las demás fechas y jugadores se conservan. Las marcas de jugadores archivados se mantienen hasta restaurar al jugador.
+
+Para usar **Quitar marca** con las cuentas reales, ejecuta la [ampliación SQL de asistencia](supabase/migrations/202611090003_clear_attendance.sql), siguiendo [la guía de Supabase](supabase/README.md#activar-quitar-marca-en-asistencia). El permiso queda limitado por RLS a los equipos autorizados y jugadores activos. La demo permite probarlo sin SQL. Si el servidor rechaza la operación, la interfaz conserva la marca y muestra el error.
