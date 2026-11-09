@@ -49,3 +49,16 @@ Las pruebas locales de `npm test` ejecutan la migración en PostgreSQL mediante 
 Antes de introducir datos reales, verifica en Supabase dos cuentas de entrenadores con equipos distintos: cada una ve solo su equipo, puede añadir/editar/archivar/restaurar jugadores y marcar asistencia, los cambios sobreviven a una nueva sesión, y la otra cuenta no puede consultarlos. Verifica también el cierre de sesión y el comportamiento ante una conexión interrumpida.
 
 La versión portátil HTML sigue siendo una demo local sin autenticación ni conexión a Supabase.
+
+## Recuperación de contraseña desde la web
+
+En **Authentication → URL Configuration**, configura:
+
+- **Site URL**: `https://emmanueltejero.github.io/aplicacionInter/`
+- **Redirect URLs**: añade la dirección exacta `https://emmanueltejero.github.io/aplicacionInter/?password_reset=1`.
+
+Desde la web, el usuario pulsa **He olvidado mi contraseña**, escribe su correo y solicita un enlace. No se envían correos automáticamente al abrir la pantalla ni desde las pruebas. La respuesta evita confirmar si una cuenta existe. Supabase limita los envíos y su servicio de correo predeterminado puede restringir destinatarios; para todos los entrenadores puede ser necesario configurar un remitente SMTP propio.
+
+El enlace verifica la sesión mediante el SDK de Supabase y abre el formulario de contraseña nueva. La contraseña se envía únicamente al proyecto de Supabase. El formulario requiere al menos 8 caracteres y confirmación idéntica; el servidor puede imponer requisitos adicionales. Tras guardarla, el usuario entra a su equipo. La sesión de recuperación se puede cancelar; los enlaces caducados o erróneos no permiten cambiar la contraseña de una sesión anterior. El formulario conserva el modo de recuperación al recargar y elimina los datos temporales del enlace del estado de navegación.
+
+Nunca se comparten contraseñas ni enlaces de recuperación por el chat o el repositorio. Las pruebas del flujo utilizan contraseñas, tokens y respuestas ficticios; la entrega del correo y el cambio de contraseña reales requieren que el usuario actúe desde su navegador.

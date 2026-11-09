@@ -9,6 +9,10 @@ export function describeAuthFailure(error: unknown): AuthFailure {
   const messages: Record<string, string> = {
     invalid_credentials: 'El correo o la contraseña no coinciden. Comprueba la cuenta creada en Authentication → Users del proyecto del club.',
     email_not_confirmed: 'El correo de esta cuenta todavía no está confirmado. Revisa su confirmación en Authentication → Users de Supabase.',
+    weak_password: 'La nueva contraseña no cumple los requisitos de Supabase. Elige otra más larga y variada.',
+    same_password: 'La nueva contraseña debe ser distinta de la anterior.',
+    otp_expired: 'El enlace ha caducado o ya se ha utilizado. Solicita un enlace nuevo.',
+    reauthentication_needed: 'Vuelve a verificar tu acceso con un enlace de recuperación nuevo.',
     user_banned: 'Esta cuenta está bloqueada. Contacta con el administrador del club.',
     email_provider_disabled: 'El acceso por correo y contraseña no está habilitado en este proyecto de Supabase.',
     bad_jwt: 'La sesión no es válida. Vuelve a entrar con tu correo y contraseña.',
