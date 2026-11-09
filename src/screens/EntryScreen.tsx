@@ -8,6 +8,7 @@ import { supabase } from '../data/supabase';
 import { demoRepository, remoteRepository } from '../data/repository';
 import type { ClubRepository, Team } from '../data/repository';
 import TeamScreen from './TeamScreen';
+import { describeAuthFailure } from '../authError';
 
 export default function EntryScreen() {
   const [session, setSession] = useState<Session | null>(null);
@@ -17,6 +18,7 @@ export default function EntryScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [diagnostic, setDiagnostic] = useState('');
   const repository = useMemo(() => supabase ? remoteRepository(supabase) : null, []);
   useEffect(() => {
     if (!supabase) return;
@@ -31,13 +33,18 @@ export default function EntryScreen() {
   }, []);
   async function signIn() {
     if (!supabase || busy) return;
-    if (!email.trim() || !password) { setError('Escribe tu correo y contraseña.'); return; }
-    setBusy(true); setError('');
+    if (!email.trim() || !password) { setError('Escribe tu correo y contraseña.'); setDiagnostic(''); return; }
+    setBusy(true); setError(''); setDiagnostic('');
     try {
       const result = await supabase.auth.signInWithPassword({ email: email.trim(), password });
       if (result.error) throw result.error;
       setPassword(''); setSession(result.data.session);
-    } catch { setError('No se pudo iniciar sesión. Revisa tus datos y la conexión; el club debe haber dado de alta tu cuenta.'); }
+    } catch (cause) {
+      const failure = describeAuthFailure(cause);
+      setError(failure.message);
+      setDiagnostic(`Código: ${failure.code}${failure.status ? ` · HTTP ${failure.status}` : ''}`);
+      setPassword('');
+    }
     finally { setBusy(false); }
   }
   async function leave() {
@@ -57,9 +64,11 @@ export default function EntryScreen() {
       <Text style={s.label}>Correo electrónico</Text><TextInput accessibilityLabel="Correo electrónico" style={s.input} value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" autoComplete="email" editable={!!supabase && !busy} />
       <Text style={s.label}>Contraseña</Text><TextInput accessibilityLabel="Contraseña" style={s.input} value={password} onChangeText={setPassword} secureTextEntry autoComplete="current-password" editable={!!supabase && !busy} onSubmitEditing={() => void signIn()} />
       {!!error && <Text accessibilityRole="alert" style={s.error}>{error}</Text>}
+      {!!diagnostic && <Text selectable style={s.diagnostic}>{diagnostic}</Text>}
       <Pressable accessibilityRole="button" accessibilityState={{ disabled: !supabase || busy }} disabled={!supabase || busy} style={[s.button, (!supabase || busy) && s.disabled]} onPress={() => void signIn()}><Text style={s.white}>{busy ? 'Entrando…' : 'Entrar con mi cuenta'}</Text></Pressable>
       <Text style={s.text}>Las cuentas las gestiona el club. Para un alta o recuperar el acceso, contacta con el administrador.</Text>
-      <Pressable accessibilityRole="button" disabled={busy} style={s.secondary} onPress={() => { setPassword(''); setError(''); setDemo(true); }}><Text style={s.link}>Probar con datos ficticios</Text></Pressable>
+      <Pressable accessibilityRole="button" disabled={busy} style={s.secondary} onPress={() => { setPassword(''); setError(''); setDiagnostic(''); setDemo(true); }}><Text style={s.link}>Probar con datos ficticios</Text></Pressable>
+      <Text style={s.version}>Acceso · versión 2</Text>
     </View>
   </ScrollView></SafeAreaView>;
 }
@@ -83,4 +92,4 @@ function TeamHub({ repository, onLeave }: { repository: ClubRepository; onLeave:
     <Pressable accessibilityRole="button" style={s.secondary} onPress={() => { void onLeave().catch(() => setError('No se pudo cerrar la sesión.')); }}><Text>Salir</Text></Pressable>
   </View></SafeAreaView>;
 }
-const s = StyleSheet.create({ safe: { flex: 1, backgroundColor: '#F4F6F9' }, content: { flexGrow: 1, justifyContent: 'center', width: '100%', maxWidth: 520, alignSelf: 'center', padding: 24 }, card: { backgroundColor: '#FFF', borderRadius: 18, padding: 24, borderWidth: 1, borderColor: '#DFE5EC', gap: 12 }, crest: { width: 88, height: 88, alignSelf: 'center' }, kicker: { color: '#176BA0', fontSize: 11, fontWeight: '700', letterSpacing: 1.3, textAlign: 'center' }, title: { color: '#17212D', fontSize: 26, fontWeight: '800', marginBottom: 4 }, text: { color: '#5D6D7E', fontSize: 13, lineHeight: 21 }, label: { fontSize: 13, color: '#17212D', fontWeight: '600' }, input: { minHeight: 48, padding: 12, borderWidth: 1, borderColor: '#DAE2EB', borderRadius: 8, color: '#17212D' }, button: { minHeight: 48, backgroundColor: '#176BA0', borderRadius: 8, justifyContent: 'center', alignItems: 'center', padding: 10 }, white: { color: '#FFF', fontWeight: '700' }, secondary: { minHeight: 48, padding: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#DAE2EB', borderRadius: 8, marginTop: 8 }, link: { color: '#176BA0', fontWeight: '600' }, error: { color: '#A52D38', fontSize: 13, lineHeight: 20 }, notice: { backgroundColor: '#E5EFF8', padding: 12, color: '#24445F', lineHeight: 20, fontSize: 13 }, disabled: { opacity: 0.5 } });
+const s = StyleSheet.create({ diagnostic: { fontSize: 12, color: '#5D6D7E' }, version: { fontSize: 11, textAlign: 'center', color: '#718096', marginTop: 8 }, safe: { flex: 1, backgroundColor: '#F4F6F9' }, content: { flexGrow: 1, justifyContent: 'center', width: '100%', maxWidth: 520, alignSelf: 'center', padding: 24 }, card: { backgroundColor: '#FFF', borderRadius: 18, padding: 24, borderWidth: 1, borderColor: '#DFE5EC', gap: 12 }, crest: { width: 88, height: 88, alignSelf: 'center' }, kicker: { color: '#176BA0', fontSize: 11, fontWeight: '700', letterSpacing: 1.3, textAlign: 'center' }, title: { color: '#17212D', fontSize: 26, fontWeight: '800', marginBottom: 4 }, text: { color: '#5D6D7E', fontSize: 13, lineHeight: 21 }, label: { fontSize: 13, color: '#17212D', fontWeight: '600' }, input: { minHeight: 48, padding: 12, borderWidth: 1, borderColor: '#DAE2EB', borderRadius: 8, color: '#17212D' }, button: { minHeight: 48, backgroundColor: '#176BA0', borderRadius: 8, justifyContent: 'center', alignItems: 'center', padding: 10 }, white: { color: '#FFF', fontWeight: '700' }, secondary: { minHeight: 48, padding: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#DAE2EB', borderRadius: 8, marginTop: 8 }, link: { color: '#176BA0', fontWeight: '600' }, error: { color: '#A52D38', fontSize: 13, lineHeight: 20 }, notice: { backgroundColor: '#E5EFF8', padding: 12, color: '#24445F', lineHeight: 20, fontSize: 13 }, disabled: { opacity: 0.5 } });
