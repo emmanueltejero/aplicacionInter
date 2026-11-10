@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { canEditExercise, exerciseDraft, filterExercises, parseExercises, validateExercise } from '../src/exercises.ts';
+import { canEditExercise, exerciseDraft, filterExercises, parseExercises, validateExercise, validateExerciseTeamCategories } from '../src/exercises.ts';
 
 const input = { title: 'Rondo técnico', description: 'Conservar el balón.', categories: ['Técnica', 'Posesión'], duration: 12, minPlayers: 6, maxPlayers: 8, spaceLength: 15, spaceWidth: 20, materials: [{ name: 'Conos', quantity: 4 }] };
 const exercise = { ...input, id: 'exercise-a', createdBy: 'coach-a', revision: 1, archivedAt: null };
@@ -39,4 +39,27 @@ test('saved library roundtrips, keeps empty lists, and rejects corrupt records',
   for (const data of [null, {}, [exercise, exercise], [{ ...exercise, duration: 0 }], [{ ...exercise, revision: 0 }], [{ ...exercise, archivedAt: 'bad' }], [{ ...exercise, materials: [null] }]]) {
     assert.throws(() => parseExercises(JSON.stringify(data)));
   }
+});
+test('team recommendations combine with content, text and archive filters without treating legacy exercises as suitable for every team', () => {
+  const shared = { ...exercise, teamCategories: ['Benjamín', 'Alevín'] };
+  const cadet = { ...exercise, id: 'cadet', title: 'Trabajo cadete', categories: ['Defensa'], teamCategories: ['Cadete', 'Femenino'] };
+  const archived = { ...shared, id: 'archived', archivedAt: '2026-11-10T12:00:00Z' };
+  const items = [exercise,shared,cadet,archived];
+  assert.deepEqual(filterExercises(items,'tecnico','Posesión',false,'Benjamín'),[shared]);
+  assert.deepEqual(filterExercises(items,'','',false,'Alevín'),[shared]);
+  assert.deepEqual(filterExercises(items,'','Defensa',false,'Benjamín'),[]);
+  assert.deepEqual(filterExercises(items,'','',false,'unclassified'),[exercise]);
+  assert.deepEqual(filterExercises(items,'femenino cadete','',false),[cadet]);
+  assert.equal(filterExercises(items,'','',true,'Benjamín').length,2);
+});
+test('recommendations validate, canonicalize and clone while legacy records and training content remain compatible', () => {
+  assert.deepEqual(validateExerciseTeamCategories(undefined),[]);
+  assert.deepEqual(validateExerciseTeamCategories(['Alevín','Benjamín']),['Benjamín','Alevín']);
+  for (const value of [null,'Cadete',['Otra'],['Benjamin'],['Cadete','Cadete'],[null],Array(10).fill('Cadete')]) assert.throws(()=>validateExerciseTeamCategories(value));
+  const classified = { ...exercise, teamCategories:['Benjamín','Alevín'] };
+  const draft = exerciseDraft(classified);draft.teamCategories.push('Cadete');assert.deepEqual(classified.teamCategories,['Benjamín','Alevín']);
+  assert.deepEqual(validateExercise(draft),input);
+  assert.deepEqual(parseExercises(JSON.stringify([classified])),[classified]);
+  assert.deepEqual(parseExercises(JSON.stringify([exercise])),[exercise]);
+  for (const teamCategories of [null,['Otra'],['Cadete','Cadete']]) assert.throws(()=>parseExercises(JSON.stringify([{...exercise,teamCategories}])));
 });

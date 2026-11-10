@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { exerciseCategories, exerciseDraft, validateExercise } from '../exercises';
+import { exerciseCategories, exerciseTeamCategories, exerciseDraft, validateExercise, validateExerciseTeamCategories } from '../exercises';
 import type { Exercise, ExerciseDraft } from '../exercises';
 import type { ExerciseSave } from '../data/exercisesRepository';
 import { newRecordId } from '../recordId';
+import { ExerciseTeamCategoriesSetup } from './ExerciseTeamCategoryFilter';
 
 export function ExerciseEditor({ exercise, busy, onSave, onClose }: {
   exercise?: Exercise; busy: boolean; onSave: (exercise: ExerciseSave) => Promise<void>; onClose: () => void;
@@ -16,7 +17,7 @@ export function ExerciseEditor({ exercise, busy, onSave, onClose }: {
   }
   async function save() {
     if (busy) return;
-    try { setError(''); await onSave({ ...validateExercise(draft), id, revision: exercise?.revision ?? 0, archived: !!exercise?.archivedAt }); }
+    try { setError(''); await onSave({ ...validateExercise(draft), teamCategories: validateExerciseTeamCategories(draft.teamCategories), id, revision: exercise?.revision ?? 0, archived: !!exercise?.archivedAt }); }
     catch (cause) { setError(cause instanceof Error ? cause.message : 'No se pudo guardar el ejercicio.'); }
   }
   return <Modal visible transparent animationType="fade" onRequestClose={() => { if (!busy) onClose(); }}>
@@ -25,10 +26,16 @@ export function ExerciseEditor({ exercise, busy, onSave, onClose }: {
       <Text style={s.text}>Se compartirá con todos los entrenadores del club. Solo su autor y los administradores pueden modificarlo.</Text>
       <Text style={s.label}>Nombre del ejercicio</Text><TextInput accessibilityLabel="Nombre del ejercicio" style={s.input} value={draft.title} onChangeText={title => setDraft({ ...draft, title })} maxLength={100} editable={!busy} />
       <Text style={s.label}>Descripción y desarrollo</Text><TextInput accessibilityLabel="Descripción del ejercicio" style={[s.input, s.description]} multiline value={draft.description} onChangeText={description => setDraft({ ...draft, description })} maxLength={5000} editable={!busy} />
-      <Text style={s.label}>Categorías · elige una o varias</Text>
+      <Text style={s.label}>Contenido del ejercicio · elige uno o varios</Text>
       <View style={s.wrap}>{exerciseCategories.map(category => {
         const checked = draft.categories.includes(category);
         return <Pressable key={category} accessibilityRole="checkbox" accessibilityLabel={`Categoría ${category}`} accessibilityState={{ checked }} disabled={busy} style={[s.secondary, checked && s.selected]} onPress={() => setDraft({ ...draft, categories: checked ? draft.categories.filter(value => value !== category) : [...draft.categories, category] })}><Text style={s.blue}>{checked ? '☑ ' : '☐ '}{category}</Text></Pressable>;
+      })}</View>
+      <Text style={s.label}>Categorías de equipo recomendadas · elige una o varias</Text>
+      <Text style={s.text}>Por ejemplo, un ejercicio puede servir para Benjamín y Alevín. Puedes combinar Femenino con una etapa. Sin selección quedará sin clasificar.</Text>
+      <View style={s.wrap}>{exerciseTeamCategories.map(category => {
+        const checked = (draft.teamCategories ?? []).includes(category);
+        return <Pressable key={category} accessibilityRole="checkbox" accessibilityLabel={`Recomendado para ${category}`} aria-checked={checked} disabled={busy} style={[s.secondary, checked && s.selected]} onPress={() => setDraft({ ...draft, teamCategories: checked ? draft.teamCategories!.filter(value => value !== category) : [...(draft.teamCategories ?? []), category] })}><Text style={s.blue}>{checked ? '☑ ' : '☐ '}{category}</Text></Pressable>;
       })}</View>
       {field('duration', 'Duración (minutos)')}
       <View style={s.fields}>{field('minPlayers', 'Mínimo de jugadores')}{field('maxPlayers', 'Máximo de jugadores')}</View>
@@ -43,6 +50,7 @@ export function ExerciseEditor({ exercise, busy, onSave, onClose }: {
       </View>)}
       <Pressable accessibilityRole="button" disabled={busy || draft.materials.length >= 30} style={s.secondary} onPress={() => setDraft({ ...draft, materials: [...draft.materials, { name: '', quantity: '1' }] })}><Text style={s.blue}>Añadir material</Text></Pressable>
       {!!error && <Text accessibilityRole="alert" style={s.error}>{error}</Text>}
+      {error.includes('202611100006_exercise_team_categories.sql') && <ExerciseTeamCategoriesSetup />}
       <Pressable accessibilityRole="button" disabled={busy} style={s.primary} onPress={() => void save()}><Text style={s.white}>{busy ? 'Guardando…' : 'Guardar ejercicio'}</Text></Pressable>
       <Pressable accessibilityRole="button" disabled={busy} style={s.secondary} onPress={onClose}><Text style={s.blue}>Cancelar</Text></Pressable>
     </ScrollView></View></View>

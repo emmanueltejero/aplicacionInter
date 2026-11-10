@@ -2,12 +2,13 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { dateKey, formatDateInput } from '../domain';
 import { exerciseCategories, filterExercises } from '../exercises';
-import type { Exercise, ExerciseCategory } from '../exercises';
+import type { Exercise, ExerciseCategory, ExerciseTeamCategoryFilter as TeamFilter } from '../exercises';
 import type { ExercisesRepository } from '../data/exercisesRepository';
 import { entryFromExercise, trainingDraft, trainingTotals, validateTraining } from '../trainingPlans';
 import type { TrainingDraft, TrainingPlan, TrainingSave } from '../trainingPlans';
 import { newRecordId } from '../recordId';
 import { TrainingTotals } from './TrainingTotals';
+import { ExerciseTeamCategoryFilter, ExerciseTeamCategoriesSetup } from './ExerciseTeamCategoryFilter';
 import { trainingStyles as s } from './trainingStyles';
 
 export function TrainingEditor({ plan, initialDate, initialPlayers, exercisesRepository, busy, onSave, onClose }: {
@@ -19,6 +20,8 @@ export function TrainingEditor({ plan, initialDate, initialPlayers, exercisesRep
   const [error, setError] = useState('');
   const [library, setLibrary] = useState<Exercise[] | null>(null);
   const [libraryError, setLibraryError] = useState('');
+  const [teamCategoriesReady, setTeamCategoriesReady] = useState(true);
+  const [teamCategory, setTeamCategory] = useState<TeamFilter>('');
   const [attempt, setAttempt] = useState(0);
   const [picker, setPicker] = useState(false);
   const [query, setQuery] = useState('');
@@ -26,7 +29,7 @@ export function TrainingEditor({ plan, initialDate, initialPlayers, exercisesRep
   const [expanded, setExpanded] = useState<string | null>(null);
   useEffect(() => {
     let active = true;
-    exercisesRepository.load().then(data => { if (active) { setLibrary(data.exercises); setLibraryError(''); } })
+    exercisesRepository.load().then(data => { if (active) { setLibrary(data.exercises); setTeamCategoriesReady(data.teamCategoriesReady !== false); setLibraryError(''); } })
       .catch(cause => { if (active) setLibraryError(cause instanceof Error ? cause.message : 'No se pudo consultar la biblioteca.'); });
     return () => { active = false; };
   }, [exercisesRepository, attempt]);
@@ -80,9 +83,12 @@ export function TrainingEditor({ plan, initialDate, initialPlayers, exercisesRep
       <Pressable accessibilityRole="button" disabled={busy || (!library && !libraryError)} style={s.secondary} onPress={() => { setLibrary(null); setLibraryError(''); setAttempt(value => value + 1); }}><Text style={s.blue}>Actualizar ejercicios</Text></Pressable>
       {library && <>
         <TextInput accessibilityLabel="Buscar ejercicios para el entrenamiento" style={s.input} value={query} onChangeText={setQuery} placeholder="Buscar por nombre, descripción o material" placeholderTextColor="#718096" />
+        {!teamCategoriesReady && <ExerciseTeamCategoriesSetup />}
+        <ExerciseTeamCategoryFilter value={teamCategory} onChange={setTeamCategory} disabled={!teamCategoriesReady || busy} />
+        <Text style={s.label}>Contenido del ejercicio</Text>
         <View style={s.controls}><Pressable accessibilityRole="radio" accessibilityLabel="Todas las categorías para entrenamiento" accessibilityState={{ checked: !category }} style={[s.secondary, !category && s.selected]} onPress={() => setCategory('')}><Text style={s.blue}>Todas</Text></Pressable>{exerciseCategories.map(item => <Pressable key={item} accessibilityRole="radio" accessibilityLabel={`Categoría para entrenamiento ${item}`} accessibilityState={{ checked: category === item }} style={[s.secondary, category === item && s.selected]} onPress={() => setCategory(item)}><Text style={s.blue}>{item}</Text></Pressable>)}</View>
-        {!filterExercises(library, query, category, false).length && <Text style={s.text}>{library.some(item => !item.archivedAt) ? 'No hay ejercicios con estos filtros.' : 'Añade ejercicios en la pestaña Ejercicios para empezar a planificar.'}</Text>}
-        {filterExercises(library, query, category, false).map(exercise => <View key={exercise.id} style={s.card}><Text style={s.subtitle}>{exercise.title}</Text><Text style={s.small}>{exercise.duration} min · {exercise.minPlayers}–{exercise.maxPlayers} jugadores · {exercise.spaceLength} × {exercise.spaceWidth} m</Text><Pressable accessibilityRole="button" accessibilityLabel={`Añadir ${exercise.title} al entrenamiento`} disabled={busy || draft.entries.length >= 50} style={s.secondary} onPress={() => add(exercise)}><Text style={s.blue}>Añadir al entrenamiento</Text></Pressable></View>)}
+        {!filterExercises(library, query, category, false, teamCategoriesReady ? teamCategory : '').length && <Text style={s.text}>{library.some(item => !item.archivedAt) ? 'No hay ejercicios con estos filtros.' : 'Añade ejercicios en la pestaña Ejercicios para empezar a planificar.'}</Text>}
+        {filterExercises(library, query, category, false, teamCategoriesReady ? teamCategory : '').map(exercise => <View key={exercise.id} style={s.card}><Text style={s.subtitle}>{exercise.title}</Text><Text style={s.small}>{exercise.duration} min · {exercise.minPlayers}–{exercise.maxPlayers} jugadores · {exercise.spaceLength} × {exercise.spaceWidth} m</Text><Text style={s.small}>Categorías de equipo: {exercise.teamCategories?.length ? exercise.teamCategories.join(' · ') : 'Sin clasificar'}</Text><Pressable accessibilityRole="button" accessibilityLabel={`Añadir ${exercise.title} al entrenamiento`} disabled={busy || draft.entries.length >= 50} style={s.secondary} onPress={() => add(exercise)}><Text style={s.blue}>Añadir al entrenamiento</Text></Pressable></View>)}
       </>}
     </View>}
     {!!error && <Text accessibilityRole="alert" style={s.error}>{error}</Text>}
