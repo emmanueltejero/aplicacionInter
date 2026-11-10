@@ -1,15 +1,20 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { entryFromExercise, parseTrainingPlans, trainingDraft, validateTraining } from '../trainingPlans';
-import type { TrainingPlan, TrainingSave } from '../trainingPlans';
+import { cloneTrainingPlan, entryFromExercise, parseTrainingPlans, trainingDraft, validateTraining, validateTrainingCopy } from '../trainingPlans';
+import type { TrainingCopy, TrainingPlan, TrainingSave } from '../trainingPlans';
+import { newRecordId } from '../recordId';
 import { demoExercisesRepository } from './exercisesRepository';
 
 export interface TrainingRepository {
   load(teamId: string): Promise<TrainingPlan[]>;
   save(teamId: string, request: TrainingSave): Promise<TrainingPlan>;
+  copy(teamId: string, request: TrainingCopy): Promise<TrainingPlan>;
 }
 export class TrainingSetupRequired extends Error {
   constructor() { super('Falta activar la planificación de entrenamientos en Supabase.'); this.name = 'TrainingSetupRequired'; }
+}
+export class TrainingCopySetupRequired extends Error {
+  constructor() { super('Falta activar la duplicación de entrenamientos en Supabase.'); this.name = 'TrainingCopySetupRequired'; }
 }
 const storageKey = '@inter-playa-honda/demo-training-plans/v1';
 function requireDemoTeam(teamId: string) { if (teamId !== 'demo-team') throw new Error('Equipo no disponible.'); }
@@ -36,9 +41,22 @@ export const demoTrainingRepository: TrainingRepository = {
       return { ...entryFromExercise(source, entry.id), duration: entry.duration };
     });
     const input = validateTraining(trainingDraft({ ...request, entries }));
-    const saved: TrainingPlan = { ...input, id: request.id, teamId, createdBy: previous?.createdBy ?? 'demo-coach', revision: request.revision + 1,
+    const saved: TrainingPlan = { ...previous, ...input, id: request.id, teamId, createdBy: previous?.createdBy ?? 'demo-coach', revision: request.revision + 1,
       archivedAt: request.archived ? previous?.archivedAt ?? new Date().toISOString() : null };
     await AsyncStorage.setItem(storageKey, JSON.stringify(previous ? plans.map(item => item.id === saved.id ? saved : item) : [...plans, saved]));
+    return saved;
+  },
+  async copy(teamId, request) {
+    const clean = validateTrainingCopy(request), plans = await this.load(teamId);
+    const target = plans.find(plan => plan.id === clean.id);
+    if (target) {
+      if (target.copiedFrom === clean.sourceId && target.copiedFromRevision === clean.sourceRevision && target.revision === 1 && target.title === clean.title && target.date === clean.date) return target;
+      throw new Error('La copia ya ha cambiado. Actualiza los entrenamientos antes de duplicar.');
+    }
+    const source = plans.find(plan => plan.id === clean.sourceId);
+    if (!source) throw new Error('No se encontró el entrenamiento original. Actualiza la lista.');
+    const saved = cloneTrainingPlan(source, clean, 'demo-coach', newRecordId);
+    await AsyncStorage.setItem(storageKey, JSON.stringify([...plans, saved]));
     return saved;
   },
 };
@@ -75,6 +93,16 @@ export function remoteTrainingRepository(client: SupabaseClient): TrainingReposi
         p_archived: request.archived, p_entries: request.entries.map(entry => ({ id: entry.id, exerciseId: entry.exerciseId, exerciseRevision: entry.exerciseRevision, duration: entry.duration })) });
       check(result.error);
       if (!result.data || result.data.id !== request.id || result.data.team_id !== teamId) throw new Error('No se pudo confirmar el guardado del entrenamiento.');
+      return fromRemote(result.data as RemotePlan);
+    },
+    async copy(teamId, request) {
+      const clean = validateTrainingCopy(request);
+      const result = await client.rpc('copy_training_plan', { p_team: teamId, p_source: clean.sourceId,
+        p_source_revision: clean.sourceRevision, p_id: clean.id, p_date: clean.date, p_title: clean.title });
+      if (result.error && ['PGRST202', '42883', '42703'].includes(result.error.code ?? '')) throw new TrainingCopySetupRequired();
+      if (result.error?.code === '40001') throw new Error('El entrenamiento original o la copia ha cambiado. Cierra esta ventana y actualiza los entrenamientos antes de duplicar.');
+      check(result.error);
+      if (!result.data || result.data.id !== clean.id || result.data.team_id !== teamId) throw new Error('No se pudo confirmar la copia del entrenamiento.');
       return fromRemote(result.data as RemotePlan);
     },
   };

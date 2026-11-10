@@ -125,7 +125,7 @@ export default function TeamScreen({ team, teams, repository, onLeave }: {
             </View>)}</View>
           </>}
         </> : tab === 'training' ? <>
-          {loading ? <ActivityIndicator accessibilityLabel="Cargando equipo" /> : loadError ? <View style={styles.error}><Text>No se pudo cargar la plantilla.</Text><Pressable accessibilityRole="button" onPress={() => { setLoading(true); void load(); }}><Text style={styles.today}>Reintentar</Text></Pressable></View> : <TrainingPlansPanel teamId={team.id} initialPlayers={activePlayers.length} repository={repository.training} exercisesRepository={repository.exercises} onBusyChange={setSaving} />}
+          {loading ? <ActivityIndicator accessibilityLabel="Cargando equipo" /> : loadError ? <View style={styles.error}><Text>No se pudo cargar la plantilla.</Text><Pressable accessibilityRole="button" onPress={() => { setLoading(true); void load(); }}><Text style={styles.today}>Reintentar</Text></Pressable></View> : <TrainingPlansPanel teamId={team.id} teamName={team.name} initialPlayers={activePlayers.length} repository={repository.training} exercisesRepository={repository.exercises} onBusyChange={setSaving} />}
         </> : tab === 'exercises' ? <ExercisesLibrary repository={repository.exercises} onBusyChange={setSaving} /> : tab === 'matches' ? <>
           {loading ? <ActivityIndicator accessibilityLabel="Cargando equipo" /> : loadError ? <View style={styles.error}><Text>No se pudo cargar la plantilla.</Text><Pressable accessibilityRole="button" onPress={() => { setLoading(true); void load(); }}><Text style={styles.today}>Reintentar</Text></Pressable></View> : <MatchesPanel teamId={team.id} roster={roster} repository={repository.matches} />}
         </> : tab === 'summary' ? <>

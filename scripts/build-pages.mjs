@@ -15,5 +15,6 @@ const exported = spawnSync(process.execPath, [resolve(root, 'node_modules/expo/b
 if (exported.error) throw exported.error;
 if (exported.status !== 0) process.exit(exported.status ?? 1);
 copyFileSync(resolve(root, 'dist/index.html'), resolve(root, 'dist/404.html'));
+copyFileSync(resolve(root, 'assets/fonts/LICENSE-DejaVu.txt'), resolve(root, 'dist/LICENSE-DejaVu.txt'));
 writeFileSync(resolve(root, 'dist/.nojekyll'), '');
 console.log(`GitHub Pages export prepared for ${basePath}/. Not uploaded or published.`);

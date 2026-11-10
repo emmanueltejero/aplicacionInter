@@ -13,7 +13,7 @@ test('team training plans authorize atomic saves and preserve exercise snapshots
       create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
       grant usage on schema auth to authenticated, anon;
       alter default privileges in schema public grant execute on functions to anon, authenticated;`);
-    for (const file of ['202611050001_club.sql', '202611090002_matches.sql', '202611090003_clear_attendance.sql', '202611100001_exercises.sql', '202611100002_training_plans.sql']) {
+    for (const file of ['202611050001_club.sql', '202611090002_matches.sql', '202611090003_clear_attendance.sql', '202611100001_exercises.sql', '202611100002_training_plans.sql', '202611100003_copy_training_plans.sql']) {
       await db.exec(readFileSync(new URL('../supabase/migrations/' + file, import.meta.url), 'utf8'));
     }
     await db.exec(`insert into auth.users values ('${id(1)}'),('${id(2)}'),('${id(3)}'),('${id(4)}'),('${id(5)}'),('${id(6)}');
@@ -27,6 +27,10 @@ test('team training plans authorize atomic saves and preserve exercise snapshots
     async function save({ plan = 500, team = 10, revision = 0, date = '2026-11-10', title = 'Plan diario', players = 10, notes = '', entries = [entry(), entry(2000, 200, 18)], archived = false } = {}) {
       const result = await db.query('select public.save_training_plan($1::uuid,$2::uuid,$3::integer,$4::date,$5,$6::integer,$7,$8::jsonb,$9::boolean) as plan',
         [id(team), id(plan), revision, date, title, players, notes, JSON.stringify(entries), archived]);
+      return result.rows[0].plan;
+    }
+    async function copy({ team = 10, source = 500, revision = 6, target = 700, date = '2026-11-17', title = 'Plan duplicado' } = {}) {
+      const result = await db.query('select public.copy_training_plan($1::uuid,$2::uuid,$3::integer,$4::uuid,$5::date,$6) as plan', [id(team), id(source), revision, id(target), date, title]);
       return result.rows[0].plan;
     }
     await t.test('server snapshots shared exercises, ignores forged content and retries one stable plan ID', async () => {
@@ -83,14 +87,47 @@ test('team training plans authorize atomic saves and preserve exercise snapshots
       assert.equal(restored.archived_at, null); assert.equal(restored.entries[0].title, 'Rondo');
       assert.equal((await db.query('select * from public.training_plans')).rows.length, 2);
     });
+    await t.test('copy retains archived historical snapshots, creates new blocks and retries after the source changes', async () => {
+      await user(2);
+      const original = await save({ revision: 5, archived: true, notes: 'Notas originales' });
+      const duplicated = await copy();
+      assert.equal(duplicated.archived_at, null); assert.equal(duplicated.revision, 1); assert.equal(duplicated.created_by, id(2));
+      assert.equal(duplicated.notes, 'Notas originales'); assert.equal(duplicated.copied_from, id(500)); assert.equal(duplicated.training_date, '2026-11-17');
+      assert.notEqual(duplicated.entries[0].id, original.entries[0].id);
+      assert.deepEqual(duplicated.entries.map(({ id, ...rest }) => rest), original.entries.map(({ id, ...rest }) => rest));
+      assert.equal(duplicated.entries[0].title, 'Rondo'); assert.equal(duplicated.entries[0].materials[0].quantity, 4);
+      await save({ revision: 6, title: 'Origen cambiado', notes: 'Notas nuevas' });
+      assert.equal((await copy()).id, duplicated.id);
+      assert.equal((await copy()).notes, 'Notas originales');
+      await db.exec('reset role'); await db.exec(readFileSync(new URL('../supabase/migrations/202611100003_copy_training_plans.sql', import.meta.url), 'utf8'));
+      await user(2); assert.equal((await copy()).id, duplicated.id);
+    });
+    await t.test('copies cannot cross team boundaries or overwrite edited targets; admin copies keep their own author', async () => {
+      await user(3);
+      await assert.rejects(copy(), /Equipo no autorizado/);
+      await assert.rejects(copy({ team: 20, target: 701 }), /original no autorizado/);
+      await user(2);
+      await assert.rejects(copy({ source: 600, target: 701 }), /original no autorizado/);
+      await assert.rejects(copy({ target: 701, revision: 6 }), /ha cambiado/);
+      const copiedEntries = (await db.query(`select entries from public.training_plans where id='${id(700)}'`)).rows[0].entries;
+      await save({ plan: 700, revision: 1, title: 'Copia editada', entries: copiedEntries.map(({ id, exerciseId, exerciseRevision, duration }) => ({ id, exerciseId, exerciseRevision, duration })) });
+      await assert.rejects(copy(), /ha cambiado/);
+      for (const patch of [{ target: 500 }, { date: 'infinity' }, { title: '' }, { revision: 0 }]) await assert.rejects(copy({ target: 701, revision: 7, ...patch }));
+      await user(1);
+      const result = await copy({ target: 702, revision: 7 });
+      assert.equal(result.created_by, id(1)); assert.equal(result.entries[0].title, 'Rondo');
+      assert.equal((await db.query('select * from public.training_plans')).rows.length, 4);
+    });
     await t.test('disabled/non-members and anonymous accounts have no access', async () => {
       for (const n of [4, 5]) {
         await user(n); assert.equal((await db.query('select * from public.training_plans')).rows.length, 0);
         await assert.rejects(save(), /Equipo no autorizado/);
+        await assert.rejects(copy(), /Equipo no autorizado/);
       }
       await db.exec('reset role; set role anon');
       await assert.rejects(db.query('select * from public.training_plans'), /permission denied/);
       await assert.rejects(save(), /permission denied/);
+      await assert.rejects(copy(), /permission denied/);
     });
   } finally { await db.close(); }
 });

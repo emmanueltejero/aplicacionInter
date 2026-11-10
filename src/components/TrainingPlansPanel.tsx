@@ -1,18 +1,19 @@
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Linking, Modal, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { dateKey, formatDateInput } from '../domain';
-import type { TrainingPlan, TrainingSave } from '../trainingPlans';
+import type { TrainingCopy, TrainingPlan, TrainingSave } from '../trainingPlans';
 import { filterTrainingPlans, trainingTotals } from '../trainingPlans';
 import type { TrainingRepository } from '../data/trainingRepository';
 import { TrainingSetupRequired } from '../data/trainingRepository';
 import type { ExercisesRepository } from '../data/exercisesRepository';
 import { TrainingEditor } from './TrainingEditor';
 import { TrainingTotals } from './TrainingTotals';
+import { TrainingCopyDialog } from './TrainingCopyDialog';
 import { trainingStyles as s } from './trainingStyles';
 
 const setupUrl = 'https://github.com/emmanueltejero/aplicacionInter/blob/main/supabase/migrations/202611100002_training_plans.sql';
-export function TrainingPlansPanel({ teamId, initialPlayers, repository, exercisesRepository, onBusyChange }: {
-  teamId: string; initialPlayers: number; repository: TrainingRepository; exercisesRepository: ExercisesRepository; onBusyChange: (busy: boolean) => void;
+export function TrainingPlansPanel({ teamId, teamName, initialPlayers, repository, exercisesRepository, onBusyChange }: {
+  teamId: string; teamName: string; initialPlayers: number; repository: TrainingRepository; exercisesRepository: ExercisesRepository; onBusyChange: (busy: boolean) => void;
 }) {
   const [plans, setPlans] = useState<TrainingPlan[] | null>(null);
   const [loadError, setLoadError] = useState<Error | null>(null);
@@ -22,6 +23,8 @@ export function TrainingPlansPanel({ teamId, initialPlayers, repository, exercis
   const locked = useRef(false);
   const [editor, setEditor] = useState<{ plan?: TrainingPlan } | null>(null);
   const [detail, setDetail] = useState<TrainingPlan | null>(null);
+  const [copySource, setCopySource] = useState<TrainingPlan | null>(null);
+  const [notice, setNotice] = useState('');
   const [filters, setFilters] = useState(() => ({ from: dateKey(new Date()), to: '', includeArchived: false }));
   useEffect(() => {
     let active = true;
@@ -38,6 +41,33 @@ export function TrainingPlansPanel({ teamId, initialPlayers, repository, exercis
       setEditor(null); setDetail(null);
     } catch (cause) { const message = cause instanceof Error ? cause.message : 'No se pudo guardar el entrenamiento.'; setError(message); throw new Error(message); }
     finally { locked.current = false; setBusy(false); onBusyChange(false); }
+  }
+  async function copy(request: TrainingCopy) {
+    if (locked.current) throw new Error('Espera a que termine la operación.');
+    locked.current = true; setBusy(true); onBusyChange(true); setError(''); setNotice('');
+    try {
+      const saved = await repository.copy(teamId, request);
+      setPlans(current => [...(current ?? []).filter(item => item.id !== saved.id), saved]);
+      setFilters({ from: saved.date, to: saved.date, includeArchived: false }); setCopySource(null); setDetail(null);
+      setNotice('Copia creada. Puedes editarla sin modificar el entrenamiento original.');
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'No se pudo crear la copia.'); throw cause; }
+    finally { locked.current = false; setBusy(false); onBusyChange(false); }
+  }
+  async function exportDocument(plan: TrainingPlan, mode: 'pdf' | 'print') {
+    if (locked.current) return;
+    locked.current = true; setBusy(true); onBusyChange(true); setError(''); setNotice('');
+    try {
+      const output = await import('../exportTraining');
+      if (mode === 'pdf') await output.saveTrainingPdf(plan, teamName); else await output.printTraining(plan, teamName);
+      setNotice(mode === 'pdf' ? 'PDF preparado. Busca el archivo descargado o guárdalo desde el menú de compartir.' : 'Si no aparece la impresión en el móvil, guarda el PDF y ábrelo en su visor para imprimirlo.');
+    } catch { setError('No se pudo preparar el documento. Revisa la conexión y vuelve a intentarlo. Si falla la impresión, prueba Guardar PDF.'); }
+    finally { locked.current = false; setBusy(false); onBusyChange(false); }
+  }
+  function exportButtons(plan: TrainingPlan) {
+    return <View style={s.controls}>
+      <Pressable accessibilityRole="button" accessibilityLabel={`Guardar PDF de ${plan.title}`} disabled={busy} style={s.secondary} onPress={() => { void exportDocument(plan, 'pdf'); }}><Text style={s.blue}>Guardar PDF</Text></Pressable>
+      <Pressable accessibilityRole="button" accessibilityLabel={`Imprimir ${plan.title}`} disabled={busy} style={s.secondary} onPress={() => { void exportDocument(plan, 'print'); }}><Text style={s.blue}>Imprimir</Text></Pressable>
+    </View>;
   }
   function refresh() { setPlans(null); setLoadError(null); setError(''); setAttempt(value => value + 1); }
   if (loadError) return <View style={s.container}>
@@ -58,6 +88,8 @@ export function TrainingPlansPanel({ teamId, initialPlayers, repository, exercis
     <Pressable accessibilityRole="checkbox" accessibilityLabel="Incluir entrenamientos archivados" accessibilityState={{ checked: filters.includeArchived }} style={s.secondary} onPress={() => setFilters({ ...filters, includeArchived: !filters.includeArchived })}><Text style={s.blue}>{filters.includeArchived ? '☑' : '☐'} Incluir archivados</Text></Pressable>
     <Pressable accessibilityRole="button" style={s.secondary} disabled={busy} onPress={refresh}><Text style={s.blue}>Actualizar entrenamientos</Text></Pressable>
     {!!error && <Text accessibilityRole="alert" style={s.error}>{error}</Text>}{!!filterError && <Text accessibilityRole="alert" style={s.error}>{filterError}</Text>}
+    {!!notice && <Text accessibilityLiveRegion="polite" style={s.blue}>{notice}</Text>}
+    {busy && !editor && !copySource && <ActivityIndicator accessibilityLabel="Procesando entrenamiento" color="#176BA0" />}
     {selected && <><Text accessibilityLiveRegion="polite" style={s.small}>{selected.length} {selected.length === 1 ? 'entrenamiento' : 'entrenamientos'}</Text>{selected.length === 0 && <Text style={s.text}>{plans.length ? 'No hay entrenamientos con estos filtros.' : 'Todavía no hay planes. Crea el primero con los ejercicios de la biblioteca.'}</Text>}
       {selected.map(plan => {
         const totals = trainingTotals(plan.entries, plan.playerCount);
@@ -66,18 +98,24 @@ export function TrainingPlansPanel({ teamId, initialPlayers, repository, exercis
           <Text style={s.text}>{totals.minutes} min · {plan.entries.length} {plan.entries.length === 1 ? 'ejercicio' : 'ejercicios'} · {plan.playerCount} jugadores previstos</Text><Text style={s.small}>Espacio común: {totals.spaceLength} × {totals.spaceWidth} m</Text>
           {!!totals.mismatches.length && <Text style={s.warningText}>Revisa los grupos de {totals.mismatches.length} {totals.mismatches.length === 1 ? 'ejercicio' : 'ejercicios'}.</Text>}
           <View style={s.controls}><Pressable accessibilityRole="button" accessibilityLabel={`Ver plan ${plan.title}`} style={s.secondary} disabled={busy} onPress={() => setDetail(plan)}><Text style={s.blue}>Ver plan</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel={`Editar entrenamiento ${plan.title}`} style={s.secondary} disabled={busy} onPress={() => { setError(''); setEditor({ plan }); }}><Text style={s.blue}>Editar</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel={`${plan.archivedAt ? 'Restaurar' : 'Archivar'} entrenamiento ${plan.title}`} style={s.secondary} disabled={busy} onPress={() => { void save({ ...plan, archived: !plan.archivedAt }).catch(() => {}); }}><Text style={s.blue}>{plan.archivedAt ? 'Restaurar' : 'Archivar'}</Text></Pressable></View>
+          <Pressable accessibilityRole="button" accessibilityLabel={`Duplicar entrenamiento ${plan.title}`} style={s.secondary} disabled={busy} onPress={() => { setError(''); setNotice(''); setCopySource(plan); }}><Text style={s.blue}>Duplicar para otra fecha</Text></Pressable>
+          {exportButtons(plan)}
         </View>;
       })}
     </>}
     {editor && <TrainingEditor key={editor.plan?.id ?? 'new'} plan={editor.plan} initialPlayers={initialPlayers} exercisesRepository={exercisesRepository} busy={busy} onSave={async request => { await save(request); setFilters({ from: request.date, to: request.date, includeArchived: request.archived }); }} onClose={() => setEditor(null)} />}
-    {detail && <Modal visible transparent animationType="fade" onRequestClose={() => setDetail(null)}><View style={s.overlay}><View style={s.modal}><ScrollView contentContainerStyle={s.modalContent}>
+    {copySource && <TrainingCopyDialog key={copySource.id} source={copySource} busy={busy} onCopy={copy} onClose={() => setCopySource(null)} />}
+    {detail && <Modal visible transparent animationType="fade" onRequestClose={() => { if (!busy) setDetail(null); }}><View style={s.overlay}><View style={s.modal}><ScrollView contentContainerStyle={s.modalContent}>
       <Text style={s.title}>{detail.title}</Text><Text style={s.blue}>{detail.date}{detail.archivedAt ? ' · Archivado' : ''}</Text><TrainingTotals entries={detail.entries} playerCount={detail.playerCount} />
+      {exportButtons(detail)}
+      <Text style={s.small}>Guarda el PDF para consultarlo sin conexión. En el móvil puedes imprimirlo desde su visor de PDF.</Text>
+      {!!error && <Text accessibilityRole="alert" style={s.error}>{error}</Text>}{!!notice && <Text style={s.blue}>{notice}</Text>}
       {!!detail.notes && <><Text style={s.label}>Notas</Text><Text style={s.text}>{detail.notes}</Text></>}
       {trainingTotals(detail.entries, detail.playerCount).timeline.map((time, index) => {
         const entry = detail.entries[index];
         return <View key={entry.id} style={s.card}><Text style={s.subtitle}>{index + 1}. {entry.title}</Text><Text style={s.blue}>Minuto {time.start}–{time.end} · {entry.duration} min</Text><Text style={s.small}>{entry.categories.join(' · ')} · {entry.minPlayers}–{entry.maxPlayers} jugadores · {entry.spaceLength} × {entry.spaceWidth} m</Text><Text style={s.text}>{entry.description}</Text><Text style={s.text}>Material: {entry.materials.map(item => `${item.quantity} ${item.name}`).join(' · ') || 'Sin material'}</Text></View>;
       })}
-      <Text style={s.small}>Las fichas de este plan se conservan como se guardaron, aunque cambie la biblioteca.</Text><Pressable accessibilityRole="button" style={s.primary} onPress={() => setDetail(null)}><Text style={s.white}>Cerrar plan</Text></Pressable>
+      <Text style={s.small}>Las fichas de este plan se conservan como se guardaron, aunque cambie la biblioteca.</Text><Pressable accessibilityRole="button" style={s.primary} disabled={busy} onPress={() => setDetail(null)}><Text style={s.white}>Cerrar plan</Text></Pressable>
     </ScrollView></View></View></Modal>}
   </View>;
 }

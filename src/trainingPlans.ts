@@ -4,10 +4,26 @@ import type { Exercise, ExerciseInput, Material } from './exercises';
 
 export type TrainingEntry = ExerciseInput & { id: string; exerciseId: string; exerciseRevision: number };
 export type TrainingInput = { title: string; date: string; playerCount: number; notes: string; entries: TrainingEntry[] };
-export type TrainingPlan = TrainingInput & { id: string; teamId: string; createdBy: string | null; revision: number; archivedAt: string | null };
+export type TrainingPlan = TrainingInput & { id: string; teamId: string; createdBy: string | null; revision: number; archivedAt: string | null; copiedFrom?: string; copiedFromRevision?: number };
 export type TrainingDraft = Omit<TrainingInput, 'playerCount' | 'entries'> & { playerCount: string; entries: (Omit<TrainingEntry, 'duration'> & { duration: string })[] };
 export type TrainingSave = TrainingInput & { id: string; revision: number; archived: boolean };
+export type TrainingCopy = { id: string; sourceId: string; sourceRevision: number; date: string; title: string };
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export function validateTrainingCopy(request: TrainingCopy): TrainingCopy {
+  const title = request.title.trim().replace(/\s+/g, ' ');
+  if (!uuid.test(request.id) || !uuid.test(request.sourceId) || request.id === request.sourceId || !Number.isInteger(request.sourceRevision) || request.sourceRevision < 1) throw new Error('Revisa el entrenamiento que quieres duplicar.');
+  if (!title || title.length > 100) throw new Error('Escribe un nombre de entre 1 y 100 caracteres para la copia.');
+  if (!isCalendarDate(request.date) || request.date.startsWith('0000')) throw new Error('Introduce una fecha válida con el formato AAAA-MM-DD.');
+  return { ...request, title };
+}
+export function cloneTrainingPlan(source: TrainingPlan, request: TrainingCopy, createdBy: string, nextId: () => string): TrainingPlan {
+  const clean = validateTrainingCopy(request);
+  if (source.id !== clean.sourceId || source.revision !== clean.sourceRevision) throw new Error('El entrenamiento ha cambiado. Actualiza los entrenamientos antes de duplicarlo.');
+  return { ...source, id: clean.id, title: clean.title, date: clean.date, createdBy, revision: 1, archivedAt: null,
+    copiedFrom: source.id, copiedFromRevision: source.revision,
+    entries: source.entries.map(entry => ({ ...entry, id: nextId(), categories: [...entry.categories], materials: entry.materials.map(item => ({ ...item })) })),
+  };
+}
 export function entryFromExercise(exercise: Exercise, id: string): TrainingEntry {
   return { ...validateExercise(exerciseDraft(exercise)), id, exerciseId: exercise.id, exerciseRevision: exercise.revision };
 }

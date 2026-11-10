@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { entryFromExercise, filterTrainingPlans, parseTrainingPlans, trainingDraft, trainingTotals, validateTraining } from '../src/trainingPlans.ts';
+import { cloneTrainingPlan, entryFromExercise, filterTrainingPlans, parseTrainingPlans, trainingDraft, trainingTotals, validateTraining, validateTrainingCopy } from '../src/trainingPlans.ts';
 
 const id = n => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 const exercise = { id: id(1), createdBy: 'coach', revision: 2, archivedAt: null, title: 'Rondo', description: 'Conservar el balón', categories: ['Posesión'], duration: 12, minPlayers: 6, maxPlayers: 12, spaceLength: 20, spaceWidth: 30, materials: [{ name: 'Conos', quantity: 4 }, { name: 'Balones', quantity: 2 }] };
@@ -56,4 +56,18 @@ test('saved plans roundtrip without losing order; corrupt storage is rejected', 
   assert.deepEqual(parseTrainingPlans(JSON.stringify([plan])), [plan]);
   assert.deepEqual(parseTrainingPlans(null), []);
   for (const value of ['null', '{}', '{', JSON.stringify([plan, plan]), JSON.stringify([{ ...plan, revision: 0 }]), JSON.stringify([{ ...plan, entries: [{ ...a, duration: 0 }] }])]) assert.throws(() => parseTrainingPlans(value));
+});
+test('duplicates are independent active plans with fresh block IDs and historical snapshots', () => {
+  const original = { ...structuredClone(plan), archivedAt: '2026-11-10T12:00:00Z' };
+  const request = { id: id(200), sourceId: original.id, sourceRevision: 1, date: '2026-11-17', title: '  Otra   sesión ' };
+  let next = 300;
+  const copy = cloneTrainingPlan(original, request, 'new-coach', () => id(next++));
+  assert.equal(copy.title, 'Otra sesión'); assert.equal(copy.date, '2026-11-17'); assert.equal(copy.archivedAt, null);
+  assert.equal(copy.revision, 1); assert.equal(copy.createdBy, 'new-coach'); assert.equal(copy.copiedFrom, original.id);
+  assert.deepEqual(copy.entries.map(item => item.id), [id(300), id(301)]);
+  assert.equal(trainingTotals(copy.entries, copy.playerCount).minutes, 30);
+  copy.entries[0].materials[0].quantity = 99; copy.entries[0].categories.push('Técnica'); copy.notes = 'Nuevas notas';
+  assert.equal(original.entries[0].materials[0].quantity, 4); assert.deepEqual(original.entries[0].categories, ['Posesión']); assert.equal(original.notes, 'Primer toque');
+  assert.throws(() => cloneTrainingPlan({ ...original, revision: 2 }, request, 'coach', () => id(400)));
+  for (const patch of [{ id: original.id }, { date: '2026-02-30' }, { date: '0000-01-01' }, { title: '' }, { sourceRevision: 0 }]) assert.throws(() => validateTrainingCopy({ ...request, ...patch }));
 });
