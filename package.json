@@ -35,7 +35,7 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
-    "test": "node tests/domain.test.mjs && node tests/matches.test.mjs && node tests/attendance-report.test.mjs && node tests/exercises.test.mjs && node tests/training-plans.test.mjs && node tests/training-document.test.mjs && node tests/auth-errors.test.mjs && node tests/password-recovery.test.mjs && node tests/database.test.mjs && node tests/matches-database.test.mjs && node tests/exercises-database.test.mjs && node tests/training-database.test.mjs && node tests/club-users.test.mjs && node tests/users-function.test.mjs && node tests/users-database.test.mjs",
+    "test": "node tests/domain.test.mjs && node tests/matches.test.mjs && node tests/attendance-report.test.mjs && node tests/exercises.test.mjs && node tests/training-plans.test.mjs && node tests/training-document.test.mjs && node tests/auth-errors.test.mjs && node tests/password-recovery.test.mjs && node tests/database.test.mjs && node tests/matches-database.test.mjs && node tests/exercises-database.test.mjs && node tests/training-database.test.mjs && node tests/club-users.test.mjs && node tests/users-function.test.mjs && node tests/users-database.test.mjs && node tests/coach-access-database.test.mjs",
     "build": "expo export --platform all",
     "lint": "eslint .",
     "demo:build": "node scripts/build-portable-demo.mjs",

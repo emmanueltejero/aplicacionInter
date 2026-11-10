@@ -116,3 +116,9 @@ Si se pierde una respuesta, el mismo identificador devuelve la copia ya creada s
 ## Activar las altas de usuarios desde la web
 
 Sigue [WEB-USERS.md](WEB-USERS.md). Requiere `migrations/202611100004_web_users.sql` y la función Edge `club-users`. El SQL no cambia las cuentas existentes; añade un trigger de aprovisionamiento, el directorio exclusivo de administradores y la creación autorizada de equipos. La función verifica sesión, administrador activo y preparación del SQL antes de llamar a la API Admin de Auth. Las cuentas nuevas reciben membresía `coach` y todas las asignaciones en la transacción de creación de Auth. No se exponen claves privadas en la web ni se concede acceso de escritura directo a `club_members` o `team_coaches`.
+
+## Activar la edición de equipos y acceso de entrenadores
+
+Ejecuta `migrations/202611100005_coach_access.sql` en **SQL Editor → New query → Run**, después del SQL de usuarios. No requiere volver a desplegar `club-users`. Se puede repetir y no modifica datos existentes. Añade una función exclusiva de administradores activos para cambiar juntos los equipos y el estado de un entrenador. Las cuentas de administrador no pueden modificarse desde ella; tampoco permite cambiar roles, contraseñas o borrar cuentas. Mantiene denegadas las escrituras directas a membresías y asignaciones.
+
+En **Usuarios del club → Equipos y acceso**, selecciona los equipos y el estado y guarda. Desactivar conserva todo el historial y deniega nuevas peticiones del entrenador mediante las políticas existentes, incluso con una sesión abierta. Reactivar permite acceder a los equipos seleccionados; sin equipos, un entrenador activo puede utilizar la biblioteca compartida. Si otro administrador ha cambiado el acceso, actualiza la lista antes de editar de nuevo. Las pruebas en PostgreSQL local comprueban permisos, retirada de equipos, desactivación y reactivación, conservación de datos, conflictos, reintentos y repetición del SQL.

@@ -1,7 +1,16 @@
 export type ClubUser = { id: string; email: string; name: string; role: 'admin' | 'coach'; enabled: boolean; teamIds: string[] };
 export type CoachAccountDraft = { id: string; email: string; name: string; password: string; teamIds: string[] };
 export type CoachAccountResult = { id: string; email: string; replayed: boolean };
+export type CoachAccessUpdate = { id: string; enabled: boolean; teamIds: string[]; expectedEnabled: boolean; expectedTeamIds: string[] };
+export type CoachAccessResult = { id: string; enabled: boolean; teamIds: string[] };
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export function validateCoachAccess(request: CoachAccessUpdate): CoachAccessUpdate {
+  if (!uuid.test(request.id) || typeof request.enabled !== 'boolean' || typeof request.expectedEnabled !== 'boolean') throw new Error('No se pudo preparar el cambio de acceso. Actualiza los usuarios.');
+  for (const [ids, limit] of [[request.teamIds, 20], [request.expectedTeamIds, 1000]] as const) {
+    if (!Array.isArray(ids) || ids.length > limit || new Set(ids).size !== ids.length || ids.some(id => !uuid.test(id))) throw new Error('Revisa los equipos seleccionados. Puedes asignar hasta 20 equipos distintos.');
+  }
+  return { ...request, teamIds: [...request.teamIds].sort(), expectedTeamIds: [...request.expectedTeamIds].sort() };
+}
 function passwordBytes(value: string) {
   let bytes = 0;
   for (const char of value) { const point = char.codePointAt(0)!; bytes += point <= 0x7f ? 1 : point <= 0x7ff ? 2 : point <= 0xffff ? 3 : 4; }

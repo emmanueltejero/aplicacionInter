@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { UsersRequestFailure, UsersSetupRequired, userCreationFailure, validateCoachAccount } from '../src/clubUsers.ts';
+import { UsersRequestFailure, UsersSetupRequired, userCreationFailure, validateCoachAccount, validateCoachAccess } from '../src/clubUsers.ts';
 const id = n => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 const draft = { id: id(100), name: '  Iván   Pérez ', email: ' COACH@EXAMPLE.INVALID ', password: 'Ficticia-123!', teamIds: [id(20), id(10)] };
 test('coach accounts normalize identity and preserve a password only in the request', () => {
@@ -16,4 +16,11 @@ test('errors never display backend text or credentials and distinguish safe retr
   assert.equal(userCreationFailure('SERVER_CONFIG').part, 'function');
   const unknown = userCreationFailure('password=SECRET&service_role=KEY');
   assert.equal(unknown.retryable, true); assert.equal(unknown.message.includes('SECRET'), false); assert.equal(unknown.message.includes('KEY'), false);
+});
+test('coach access edits preserve the original snapshot and allow library-only active accounts', () => {
+  const request = { id: id(2), enabled: false, teamIds: [id(20), id(10)], expectedEnabled: true, expectedTeamIds: [id(20), id(10)] };
+  const clean = validateCoachAccess(request);
+  assert.deepEqual(clean.teamIds, [id(10), id(20)]); assert.deepEqual(request.teamIds, [id(20), id(10)]);
+  assert.deepEqual(validateCoachAccess({ ...request, enabled: true, teamIds: [] }).teamIds, []);
+  for (const patch of [{ id: 'bad' }, { enabled: null }, { expectedEnabled: undefined }, { teamIds: [id(10), id(10)] }, { expectedTeamIds: ['bad'] }, { teamIds: Array.from({ length: 21 }, (_, i) => id(i + 10)) }]) assert.throws(() => validateCoachAccess({ ...request, ...patch }));
 });

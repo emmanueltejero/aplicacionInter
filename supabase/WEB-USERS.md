@@ -32,12 +32,23 @@ Si despliegas con Supabase CLI, `supabase/config.toml` ya contiene `verify_jwt =
 4. Pulsa **Crear entrenador**. La cuenta queda confirmada y puede iniciar sesión con esas credenciales. La operación no envía un correo automático.
 5. Comparte las credenciales por un canal privado y comprueba el acceso con el entrenador. La cuenta del administrador sigue conectada; no se inicia sesión como el usuario recién creado.
 
-Los entrenadores y cuentas desactivadas no ven este acceso y no pueden llamar a los endpoints de administración. La lista muestra usuarios del club, roles, estado y equipos. La gestión de roles de administrador, la desactivación y la modificación de asignaciones de cuentas ya existentes continúan en el panel de Supabase.
+Los entrenadores y cuentas desactivadas no ven este acceso y no pueden llamar a los endpoints de administración. La lista muestra usuarios del club, roles, estado y equipos. Las cuentas y roles de administrador se gestionan desde el panel de Supabase.
+
+## 4. Activar la edición de equipos y acceso
+
+Si las altas ya funcionan, solo hace falta este paso: abre [202611100005_coach_access.sql](migrations/202611100005_coach_access.sql), copia todo y ejecútalo en **Supabase → SQL Editor → New query → Run**. Se puede repetir y no cambia las cuentas ni el historial. No es necesario volver a desplegar `club-users`.
+
+En **Usuarios del club**, pulsa **Equipos y acceso** en la tarjeta de un entrenador. Marca sus equipos, activa o desactiva **Acceso activado** y pulsa **Guardar acceso**. Puedes cancelar sin aplicar cambios. El formulario solo permite modificar entrenadores; las cuentas de administrador, incluida la propia, están protegidas también en la base de datos.
+
+Desactivar conserva la cuenta, los ejercicios, la asistencia y el resto del historial. La base de datos bloquea las siguientes peticiones de lectura y escritura de esa cuenta, aunque siga iniciada su sesión. Los datos ya cargados en pantalla no desaparecen hasta actualizar; el entrenador verá sus equipos vigentes al recargar la aplicación. Reactivar devuelve acceso a los equipos seleccionados. Con acceso activado y ningún equipo seleccionado, solo podrá utilizar la biblioteca compartida. Este formulario no elimina cuentas de Authentication ni cambia contraseñas.
+
+Los cambios de estado y equipos se aplican juntos. Si otro administrador ha cambiado el acceso desde que abriste el formulario, se rechaza el guardado: cierra el formulario, pulsa **Actualizar usuarios** y revisa de nuevo. Si se pierde la respuesta, puedes reintentar con los mismos valores o actualizar la lista para comprobar el resultado; no se anuncia éxito hasta recibir confirmación.
 
 ## Si aparece un error
 
 - **Falta activar la gestión de usuarios:** ejecuta el SQL del paso 1. La función no crea cuentas mientras falte el mecanismo de asignación automática.
 - **Falta desplegar la función `club-users`:** comprueba el nombre y el despliegue del paso 2.
+- **Falta activar la edición del acceso:** ejecuta el SQL del paso 4. No hace falta cambiar el despliegue de la función ni sus secretos.
 - **Sesión no válida / HTTP 401 en la función:** comprueba el ajuste de JWT del gateway del paso 2. Si ya está desactivado, cierra sesión y vuelve a entrar para obtener una sesión vigente. La función seguirá verificándola con Authentication.
 - **Solo administradores:** la cuenta debe tener `role=admin` y `enabled=true` en `club_members`. No se confía en roles de `user_metadata` o campos del formulario.
 - **El correo ya existe:** no se modifica esa cuenta ni su contraseña. Revisa si ya aparece en la lista o termina su configuración desde Supabase si se creó manualmente sin membresía.

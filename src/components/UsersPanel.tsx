@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Linking, Modal, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
-import type { CoachAccountDraft } from '../clubUsers';
+import type { ClubUser, CoachAccessUpdate, CoachAccountDraft } from '../clubUsers';
 import { UsersSetupRequired } from '../clubUsers';
 import type { UsersRepository } from '../data/usersRepository';
 import { newRecordId } from '../recordId';
 import { normalizeExerciseSearch } from '../exercises';
 import { CoachAccountForm } from './CoachAccountForm';
+import { CoachAccessEditor } from './CoachAccessEditor';
 import { trainingStyles as s } from './trainingStyles';
 
 const guideUrl = 'https://github.com/emmanueltejero/aplicacionInter/blob/main/supabase/WEB-USERS.md';
@@ -24,6 +25,7 @@ export function UsersPanel({ repository, onBusyChange, onTeamsChanged }: {
   const [form, setForm] = useState(false);
   const [teamEditor, setTeamEditor] = useState<{ id: string; name: string } | null>(null);
   const [teamError, setTeamError] = useState('');
+  const [accessEditor, setAccessEditor] = useState<ClubUser | null>(null);
   useEffect(() => {
     let active = true;
     repository.load().then(result => { if (active) { setData(result); setLoadError(null); } })
@@ -55,6 +57,17 @@ export function UsersPanel({ repository, onBusyChange, onTeamsChanged }: {
     } catch (cause) { setTeamError(cause instanceof Error ? cause.message : 'No se pudo crear el equipo.'); }
     finally { locked.current = false; setBusy(false); onBusyChange(false); }
   }
+  async function saveAccess(request: CoachAccessUpdate) {
+    if (locked.current) throw new Error('Espera a que termine la operación.');
+    locked.current = true; setBusy(true); onBusyChange(true); setError(''); setNotice('');
+    try {
+      const result = await repository.updateAccess(request);
+      setData(current => current ? { ...current, users: current.users.map(user => user.id === result.id ? { ...user, enabled: result.enabled, teamIds: result.teamIds } : user) } : current);
+      setAccessEditor(null);
+      setNotice(result.enabled ? 'Acceso y equipos del entrenador actualizados.' : 'Acceso del entrenador desactivado. Su cuenta y el historial se conservan.');
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'No se pudo guardar el acceso.'); throw cause; }
+    finally { locked.current = false; setBusy(false); onBusyChange(false); }
+  }
   if (loadError) return <View style={s.container}>
     <Text style={s.title}>Usuarios del club</Text><Text accessibilityRole="alert" style={s.error}>{loadError.message}</Text>
     {loadError instanceof UsersSetupRequired && <Text style={s.text}>Este apartado requiere activar el SQL de usuarios y desplegar la función club-users en Supabase una vez. La guía explica ambos pasos.</Text>}
@@ -65,7 +78,7 @@ export function UsersPanel({ repository, onBusyChange, onTeamsChanged }: {
   const text = normalizeExerciseSearch(query).trim();
   const users = data.users.filter(user => normalizeExerciseSearch(`${user.name} ${user.email} ${user.teamIds.map(id => data.teams.find(team => team.id === id)?.name ?? '').join(' ')}`).includes(text));
   return <View style={s.container}>
-    <Text style={s.title}>Usuarios del club</Text><Text style={s.text}>Da de alta entrenadores y elige sus equipos. Este apartado está reservado a administradores.</Text>
+    <Text style={s.title}>Usuarios del club</Text><Text style={s.text}>Da de alta entrenadores, cambia sus equipos y activa o desactiva su acceso. Este apartado está reservado a administradores.</Text>
     <Pressable accessibilityRole="button" style={s.primary} disabled={busy || !data.teams.length} onPress={() => { setError(''); setNotice(''); setForm(true); }}><Text style={s.white}>Añadir entrenador</Text></Pressable>
     {!data.teams.length && <Text style={s.text}>Crea el primer equipo para poder asignarlo al entrenador.</Text>}
     <View style={s.controls}><Pressable accessibilityRole="button" style={s.secondary} disabled={busy} onPress={() => { setTeamError(''); setTeamEditor({ id: newRecordId(), name: '' }); }}><Text style={s.blue}>Crear equipo</Text></Pressable><Pressable accessibilityRole="button" style={s.secondary} disabled={busy} onPress={refresh}><Text style={s.blue}>Actualizar usuarios</Text></Pressable></View>
@@ -77,9 +90,11 @@ export function UsersPanel({ repository, onBusyChange, onTeamsChanged }: {
       <Text style={s.subtitle}>{user.name || user.email}</Text><Text style={s.text}>{user.email}</Text>
       <Text style={s.blue}>{user.role === 'admin' ? 'Administrador' : 'Entrenador'} · {user.enabled ? 'Activo' : 'Desactivado'}</Text>
       <Text style={s.text}>{user.role === 'admin' ? 'Acceso a todos los equipos del club' : user.teamIds.map(id => data.teams.find(team => team.id === id)?.name ?? 'Equipo no disponible').join(' · ') || 'Sin equipos asignados'}</Text>
+      {user.role === 'coach' && <Pressable accessibilityRole="button" accessibilityLabel={`Gestionar acceso de ${user.email}`} disabled={busy} style={s.secondary} onPress={() => { setError(''); setNotice(''); setAccessEditor(user); }}><Text style={s.blue}>Equipos y acceso</Text></Pressable>}
     </View>)}
     <Pressable accessibilityRole="button" style={s.secondary} disabled={busy} onPress={openGuide}><Text style={s.blue}>Guía de activación de Usuarios</Text></Pressable>
     {form && <CoachAccountForm teams={data.teams} busy={busy} onCreate={create} onClose={() => setForm(false)} onSetup={openGuide} />}
+    {accessEditor && <CoachAccessEditor key={accessEditor.id} user={accessEditor} teams={data.teams} busy={busy} onSave={saveAccess} onClose={() => setAccessEditor(null)} />}
     {teamEditor && <Modal visible transparent animationType="fade" onRequestClose={() => { if (!busy) setTeamEditor(null); }}><View style={s.overlay}><View style={s.modal}><ScrollView contentContainerStyle={s.modalContent} keyboardShouldPersistTaps="handled">
       <Text style={s.title}>Crear equipo</Text><Text style={s.label}>Nombre del equipo</Text><TextInput accessibilityLabel="Nombre del nuevo equipo" style={s.input} value={teamEditor.name} onChangeText={name => setTeamEditor({ ...teamEditor, name })} editable={!busy} maxLength={80} />
       {!!teamError && <Text accessibilityRole="alert" style={s.error}>{teamError}</Text>}
