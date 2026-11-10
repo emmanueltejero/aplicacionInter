@@ -5,11 +5,11 @@ import type { Player } from '../domain';
 import { newMatchId, validateMatch } from '../matches';
 import type { Match, MatchDraft } from '../matches';
 
-export function MatchEditor({ match, roster, busy, onSave, onClose }: {
-  match?: Match; roster: Player[]; busy: boolean; onSave: (match: Match) => Promise<void>; onClose: () => void;
+export function MatchEditor({ match, initialDate, roster, busy, onSave, onClose }: {
+  match?: Match; initialDate?: string; roster: Player[]; busy: boolean; onSave: (match: Match) => Promise<void>; onClose: () => void;
 }) {
   const [draft, setDraft] = useState<MatchDraft>(() => match ? { ...match, duration: String(match.duration), players: Object.fromEntries(match.players.map(item => [item.playerId, item.minutes === null ? '' : String(item.minutes)])) }
-    : { id: newMatchId(), date: dateKey(new Date()), opponent: '', duration: '60', venue: 'home', played: false, players: {} });
+    : { id: newMatchId(), date: initialDate ?? dateKey(new Date()), opponent: '', duration: '60', venue: 'home', played: false, players: {} });
   const [error, setError] = useState('');
   const candidates = roster.filter(player => !player.archivedAt || match?.players.some(entry => entry.playerId === player.id));
   function toggle(playerId: string) {

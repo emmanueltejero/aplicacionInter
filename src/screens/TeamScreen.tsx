@@ -11,6 +11,8 @@ import { MatchesPanel } from '../components/MatchesPanel';
 import { AttendanceDateSearch } from '../components/AttendanceDateSearch';
 import { ExercisesLibrary } from '../components/ExercisesLibrary';
 import { TrainingPlansPanel } from '../components/TrainingPlansPanel';
+import { TeamCalendar } from '../components/TeamCalendar';
+import { calendarDate } from '../teamCalendar';
 
 const options: { value: Attendance; label: string; short: string; color: string; bg: string }[] = [
   { value: 'present', label: 'Presente', short: 'Sí', color: '#176BA0', bg: '#DEEEFB' },
@@ -21,9 +23,9 @@ const options: { value: Attendance; label: string; short: string; color: string;
 export default function TeamScreen({ team, teams, repository, onLeave, isAdmin = false }: {
   team: Team; teams: Team[]; repository: ClubRepository; onLeave: () => Promise<void>; isAdmin?: boolean;
 }) {
-  const { view } = useLocalSearchParams<{ view?: string }>();
-  const tab = view === 'team' ? 'team' : view === 'summary' ? 'summary' : view === 'matches' ? 'matches' : view === 'exercises' ? 'exercises' : view === 'training' ? 'training' : 'attendance';
-  const [date, setDate] = useState(() => new Date());
+  const { view, calendar_date, attendance_date } = useLocalSearchParams<{ view?: string; calendar_date?: string; attendance_date?: string }>();
+  const tab = view === 'team' ? 'team' : view === 'summary' ? 'summary' : view === 'matches' ? 'matches' : view === 'exercises' ? 'exercises' : view === 'training' ? 'training' : view === 'calendar' ? 'calendar' : 'attendance';
+  const date = calendarDate(attendance_date) ?? new Date();
   const [register, setRegister] = useState<Register>({});
   const [roster, setRoster] = useState<Player[]>([]);
   const [loading, setLoading] = useState(true);
@@ -41,6 +43,9 @@ export default function TeamScreen({ team, teams, repository, onLeave, isAdmin =
   // Retain recorded history for archived players without marking new attendance.
   const attendancePlayers = roster.filter(player => !player.archivedAt || day[player.id]);
   const counts = summary(attendancePlayers, day);
+  const calendarKey = dateKey(calendarDate(calendar_date) ?? new Date());
+  function selectDate(value: Date) { router.setParams({ attendance_date: dateKey(value) }); }
+  function changeTab(value: string) { router.setParams({ view: value, training_id: undefined, match_id: undefined, create_training: undefined, create_match: undefined }); }
 
   async function load() {
     try {
@@ -82,7 +87,7 @@ export default function TeamScreen({ team, teams, repository, onLeave, isAdmin =
   function moveDate(offset: number) {
     const next = new Date(date);
     next.setDate(next.getDate() + offset);
-    setDate(next);
+    selectDate(next);
   }
 
   return (
@@ -97,25 +102,26 @@ export default function TeamScreen({ team, teams, repository, onLeave, isAdmin =
         </View>
       </View>
       <ScrollView contentContainerStyle={styles.content}>
-        {teams.length > 1 && <View style={styles.teamChoices}>{teams.map(item => <Pressable key={item.id} accessibilityRole="button" accessibilityState={{ selected: item.id === team.id }} disabled={saving} onPress={() => router.setParams({ team: item.id })} style={styles.teamChoice}><Text style={styles.today}>{item.name}</Text></Pressable>)}</View>}
+        {teams.length > 1 && <View style={styles.teamChoices}>{teams.map(item => <Pressable key={item.id} accessibilityRole="button" accessibilityState={{ selected: item.id === team.id }} disabled={saving} onPress={() => router.setParams({ team: item.id, training_id: undefined, match_id: undefined, create_training: undefined, create_match: undefined })} style={styles.teamChoice}><Text style={styles.today}>{item.name}</Text></Pressable>)}</View>}
         <Text style={styles.kicker}>TU EQUIPO · INTER PLAYA HONDA</Text>
         <Text style={styles.title}>Cada jugador cuenta.</Text>
         <Text style={styles.subtitle}>El día a día del equipo, en un mismo lugar.</Text>
         <View style={styles.teamCard}><View><Text style={styles.teamName}>{team.name}</Text><Text style={styles.muted}>{activePlayers.length} jugadores activos{repository.demo ? ' · Datos ficticios' : ''}</Text></View><Text style={styles.ball}>⚽</Text></View>
         <View style={styles.tabs}>
-          {([{ id: 'attendance', label: 'Pasar lista' }, { id: 'team', label: 'Plantilla' }, { id: 'summary', label: 'Resumen' }, { id: 'matches', label: 'Partidos' }, { id: 'exercises', label: 'Ejercicios' }, { id: 'training', label: 'Entrenar' }] as const).map(item => (
-            <Pressable key={item.id} accessibilityRole="tab" accessibilityState={{ selected: tab === item.id }} disabled={saving} onPress={() => router.setParams({ view: item.id })} style={[styles.tab, tab === item.id && styles.tabActive]}><Text style={[styles.tabText, tab === item.id && styles.tabTextActive]}>{item.label}</Text></Pressable>
+          {([{ id: 'attendance', label: 'Pasar lista' }, { id: 'team', label: 'Plantilla' }, { id: 'summary', label: 'Resumen' }, { id: 'matches', label: 'Partidos' }, { id: 'exercises', label: 'Ejercicios' }, { id: 'training', label: 'Entrenar' }, { id: 'calendar', label: 'Calendario' }] as const).map(item => (
+            <Pressable key={item.id} accessibilityRole="tab" accessibilityState={{ selected: tab === item.id }} disabled={saving} onPress={() => changeTab(item.id)} style={[styles.tab, tab === item.id && styles.tabActive]}><Text style={[styles.tabText, tab === item.id && styles.tabTextActive]}>{item.label}</Text></Pressable>
           ))}
         </View>
+        {!!calendarDate(calendar_date) && ['attendance', 'training', 'matches'].includes(tab) && <Pressable accessibilityRole="button" style={styles.teamChoice} disabled={saving} onPress={() => changeTab('calendar')}><Text style={styles.today}>Volver al calendario</Text></Pressable>}
         {!!error && <View style={styles.error}><Text accessibilityRole="alert">{error}</Text></View>}
         {tab === 'attendance' ? <>
           <View style={styles.sectionHeading}><Text style={styles.sectionTitle}>Asistencia al entrenamiento</Text><Text style={styles.small}>REGISTRO DIARIO</Text></View>
           <View style={styles.dateBar}>
             <Pressable accessibilityRole="button" accessibilityLabel="Día anterior" style={styles.arrow} disabled={saving} onPress={() => moveDate(-1)}><Text style={styles.arrowText}>‹</Text></Pressable>
-            <View style={styles.dateCenter}><Text style={styles.dateText}>{date.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}</Text><Pressable accessibilityRole="button" disabled={saving} onPress={() => setDate(new Date())}><Text style={styles.today}>{key === dateKey(new Date()) ? 'Hoy' : 'Volver a hoy'} · {date.getFullYear()}</Text></Pressable></View>
+            <View style={styles.dateCenter}><Text style={styles.dateText}>{date.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}</Text><Pressable accessibilityRole="button" disabled={saving} onPress={() => selectDate(new Date())}><Text style={styles.today}>{key === dateKey(new Date()) ? 'Hoy' : 'Volver a hoy'} · {date.getFullYear()}</Text></Pressable></View>
             <Pressable accessibilityRole="button" accessibilityLabel="Día siguiente" style={styles.arrow} disabled={saving} onPress={() => moveDate(1)}><Text style={styles.arrowText}>›</Text></Pressable>
           </View>
-          <AttendanceDateSearch key={key} date={date} disabled={saving} onSelect={setDate} />
+          <AttendanceDateSearch key={key} date={date} disabled={saving} onSelect={selectDate} />
           {loading ? <ActivityIndicator style={styles.loader} color="#176BA0" accessibilityLabel="Cargando asistencia" /> : loadError ? <View style={styles.error}><Text>No se pudo cargar el equipo. No se han sobrescrito los datos.</Text><Pressable accessibilityRole="button" onPress={() => { setLoading(true); void load(); }}><Text style={styles.today}>Reintentar</Text></Pressable></View> : <>
             <View style={styles.stats}>{[{ label: 'Presentes', count: counts.present, color: '#176BA0' }, { label: 'Ausentes', count: counts.absent, color: '#A52D38' }, { label: 'Justificados', count: counts.excused, color: '#855A0D' }].map(stat => <View key={stat.label} style={styles.stat}><Text style={[styles.statNumber, { color: stat.color }]}>{stat.count}</Text><Text style={styles.statLabel}>{stat.label}</Text></View>)}</View>
             <View style={styles.listHeading}><Text style={styles.muted}>{counts.pending ? `${counts.pending} pendientes de marcar` : 'Lista completada'}</Text><Text accessibilityLiveRegion="polite" style={styles.small}>{saving ? 'Guardando…' : error ? 'Revisa el aviso' : repository.demo ? 'Guardado local' : 'Datos del servidor'}</Text></View>
@@ -125,10 +131,16 @@ export default function TeamScreen({ team, teams, repository, onLeave, isAdmin =
               {!!day[player.id] && !player.archivedAt && <Pressable accessibilityRole="button" accessibilityLabel={`Quitar marca de ${player.name}`} disabled={saving} style={styles.clearMark} onPress={() => { void mutate(() => repository.clearAttendance(team.id, key, player.id)).catch(() => {}); }}><Text style={styles.today}>Quitar marca</Text></Pressable>}
             </View>)}</View>
           </>}
+        </> : tab === 'calendar' ? <>
+          {loading ? <ActivityIndicator accessibilityLabel="Cargando equipo" /> : loadError ? <View style={styles.error}><Text>No se pudo cargar la asistencia del equipo.</Text><Pressable accessibilityRole="button" onPress={() => { setLoading(true); void load(); }}><Text style={styles.today}>Reintentar</Text></Pressable></View> : <TeamCalendar teamId={team.id} date={calendarKey} register={register} matchesRepository={repository.matches} trainingRepository={repository.training}
+            onDateChange={value => router.setParams({ calendar_date: value })}
+            onAttendance={() => router.setParams({ view: 'attendance', calendar_date: calendarKey, attendance_date: calendarKey })}
+            onTraining={id => router.setParams({ view: 'training', calendar_date: calendarKey, training_id: id, create_training: id ? undefined : '1' })}
+            onMatch={id => router.setParams({ view: 'matches', match_view: 'list', calendar_date: calendarKey, match_id: id, create_match: id ? undefined : '1' })} />}
         </> : tab === 'training' ? <>
           {loading ? <ActivityIndicator accessibilityLabel="Cargando equipo" /> : loadError ? <View style={styles.error}><Text>No se pudo cargar la plantilla.</Text><Pressable accessibilityRole="button" onPress={() => { setLoading(true); void load(); }}><Text style={styles.today}>Reintentar</Text></Pressable></View> : <TrainingPlansPanel teamId={team.id} teamName={team.name} initialPlayers={activePlayers.length} repository={repository.training} exercisesRepository={repository.exercises} onBusyChange={setSaving} />}
         </> : tab === 'exercises' ? <ExercisesLibrary repository={repository.exercises} onBusyChange={setSaving} /> : tab === 'matches' ? <>
-          {loading ? <ActivityIndicator accessibilityLabel="Cargando equipo" /> : loadError ? <View style={styles.error}><Text>No se pudo cargar la plantilla.</Text><Pressable accessibilityRole="button" onPress={() => { setLoading(true); void load(); }}><Text style={styles.today}>Reintentar</Text></Pressable></View> : <MatchesPanel teamId={team.id} roster={roster} repository={repository.matches} />}
+          {loading ? <ActivityIndicator accessibilityLabel="Cargando equipo" /> : loadError ? <View style={styles.error}><Text>No se pudo cargar la plantilla.</Text><Pressable accessibilityRole="button" onPress={() => { setLoading(true); void load(); }}><Text style={styles.today}>Reintentar</Text></Pressable></View> : <MatchesPanel teamId={team.id} roster={roster} repository={repository.matches} onBusyChange={setSaving} />}
         </> : tab === 'summary' ? <>
           {loading ? <ActivityIndicator accessibilityLabel="Cargando resumen" /> : loadError ? <View style={styles.error}><Text>No se pudo cargar el resumen.</Text><Pressable accessibilityRole="button" onPress={() => { setLoading(true); void load(); }}><Text style={styles.today}>Reintentar</Text></Pressable></View> : <PlayerSummary teamId={team.id} roster={roster} register={register} filters={reportFilters} onChange={setReportFilters} repository={repository.matches} />}
         </> : <>

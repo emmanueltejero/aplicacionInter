@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Linking, Modal, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { router, useLocalSearchParams } from 'expo-router';
+import { calendarDate } from '../teamCalendar';
 import { dateKey, formatDateInput } from '../domain';
 import type { TrainingCopy, TrainingPlan, TrainingSave } from '../trainingPlans';
 import { filterTrainingPlans, trainingTotals } from '../trainingPlans';
@@ -15,30 +17,36 @@ const setupUrl = 'https://github.com/emmanueltejero/aplicacionInter/blob/main/su
 export function TrainingPlansPanel({ teamId, teamName, initialPlayers, repository, exercisesRepository, onBusyChange }: {
   teamId: string; teamName: string; initialPlayers: number; repository: TrainingRepository; exercisesRepository: ExercisesRepository; onBusyChange: (busy: boolean) => void;
 }) {
+  const { training_id, create_training, calendar_date } = useLocalSearchParams<{ training_id?: string; create_training?: string; calendar_date?: string }>();
+  const initialDate = calendarDate(calendar_date);
   const [plans, setPlans] = useState<TrainingPlan[] | null>(null);
   const [loadError, setLoadError] = useState<Error | null>(null);
   const [error, setError] = useState('');
   const [attempt, setAttempt] = useState(0);
   const [busy, setBusy] = useState(false);
   const locked = useRef(false);
-  const [editor, setEditor] = useState<{ plan?: TrainingPlan } | null>(null);
-  const [detail, setDetail] = useState<TrainingPlan | null>(null);
+  const [editorState, setEditor] = useState<{ plan?: TrainingPlan } | null>(null);
+  const [detailState, setDetail] = useState<TrainingPlan | null>(null);
+  const editor: { plan?: TrainingPlan } | null = editorState ?? (create_training === '1' ? {} : null);
+  const detail = detailState ?? plans?.find(item => item.id === training_id) ?? null;
   const [copySource, setCopySource] = useState<TrainingPlan | null>(null);
   const [notice, setNotice] = useState('');
-  const [filters, setFilters] = useState(() => ({ from: dateKey(new Date()), to: '', includeArchived: false }));
+  const [filters, setFilters] = useState(() => ({ from: initialDate ? dateKey(initialDate) : dateKey(new Date()), to: initialDate ? dateKey(initialDate) : '', includeArchived: false }));
   useEffect(() => {
     let active = true;
     repository.load(teamId).then(data => { if (active) { setPlans(data); setLoadError(null); } })
       .catch(cause => { if (active) setLoadError(cause instanceof Error ? cause : new Error('No se pudieron cargar los entrenamientos.')); });
     return () => { active = false; };
   }, [repository, teamId, attempt]);
+  function closeEditor() { setEditor(null); router.setParams({ create_training: undefined }); }
+  function closeDetail() { setDetail(null); router.setParams({ training_id: undefined }); }
   async function save(request: TrainingSave) {
     if (locked.current) throw new Error('Espera a que termine el guardado.');
     locked.current = true; setBusy(true); onBusyChange(true); setError('');
     try {
       const saved = await repository.save(teamId, request);
       setPlans(current => current?.some(item => item.id === saved.id) ? current.map(item => item.id === saved.id ? saved : item) : [...(current ?? []), saved]);
-      setEditor(null); setDetail(null);
+      closeEditor(); closeDetail();
     } catch (cause) { const message = cause instanceof Error ? cause.message : 'No se pudo guardar el entrenamiento.'; setError(message); throw new Error(message); }
     finally { locked.current = false; setBusy(false); onBusyChange(false); }
   }
@@ -88,6 +96,7 @@ export function TrainingPlansPanel({ teamId, teamName, initialPlayers, repositor
     <Pressable accessibilityRole="checkbox" accessibilityLabel="Incluir entrenamientos archivados" accessibilityState={{ checked: filters.includeArchived }} style={s.secondary} onPress={() => setFilters({ ...filters, includeArchived: !filters.includeArchived })}><Text style={s.blue}>{filters.includeArchived ? '☑' : '☐'} Incluir archivados</Text></Pressable>
     <Pressable accessibilityRole="button" style={s.secondary} disabled={busy} onPress={refresh}><Text style={s.blue}>Actualizar entrenamientos</Text></Pressable>
     {!!error && <Text accessibilityRole="alert" style={s.error}>{error}</Text>}{!!filterError && <Text accessibilityRole="alert" style={s.error}>{filterError}</Text>}
+    {!!training_id && !plans.some(item => item.id === training_id) && <Text accessibilityRole="alert" style={s.error}>Este entrenamiento ya no está disponible en este equipo. Vuelve al calendario y actualízalo.</Text>}
     {!!notice && <Text accessibilityLiveRegion="polite" style={s.blue}>{notice}</Text>}
     {busy && !editor && !copySource && <ActivityIndicator accessibilityLabel="Procesando entrenamiento" color="#176BA0" />}
     {selected && <><Text accessibilityLiveRegion="polite" style={s.small}>{selected.length} {selected.length === 1 ? 'entrenamiento' : 'entrenamientos'}</Text>{selected.length === 0 && <Text style={s.text}>{plans.length ? 'No hay entrenamientos con estos filtros.' : 'Todavía no hay planes. Crea el primero con los ejercicios de la biblioteca.'}</Text>}
@@ -103,9 +112,9 @@ export function TrainingPlansPanel({ teamId, teamName, initialPlayers, repositor
         </View>;
       })}
     </>}
-    {editor && <TrainingEditor key={editor.plan?.id ?? 'new'} plan={editor.plan} initialPlayers={initialPlayers} exercisesRepository={exercisesRepository} busy={busy} onSave={async request => { await save(request); setFilters({ from: request.date, to: request.date, includeArchived: request.archived }); }} onClose={() => setEditor(null)} />}
+    {editor && <TrainingEditor key={editor.plan?.id ?? 'new'} plan={editor.plan} initialDate={initialDate ? dateKey(initialDate) : undefined} initialPlayers={initialPlayers} exercisesRepository={exercisesRepository} busy={busy} onSave={async request => { await save(request); setFilters({ from: request.date, to: request.date, includeArchived: request.archived }); }} onClose={closeEditor} />}
     {copySource && <TrainingCopyDialog key={copySource.id} source={copySource} busy={busy} onCopy={copy} onClose={() => setCopySource(null)} />}
-    {detail && <Modal visible transparent animationType="fade" onRequestClose={() => { if (!busy) setDetail(null); }}><View style={s.overlay}><View style={s.modal}><ScrollView contentContainerStyle={s.modalContent}>
+    {detail && <Modal visible transparent animationType="fade" onRequestClose={() => { if (!busy) closeDetail(); }}><View style={s.overlay}><View style={s.modal}><ScrollView contentContainerStyle={s.modalContent}>
       <Text style={s.title}>{detail.title}</Text><Text style={s.blue}>{detail.date}{detail.archivedAt ? ' · Archivado' : ''}</Text><TrainingTotals entries={detail.entries} playerCount={detail.playerCount} />
       {exportButtons(detail)}
       <Text style={s.small}>Guarda el PDF para consultarlo sin conexión. En el móvil puedes imprimirlo desde su visor de PDF.</Text>
@@ -115,7 +124,7 @@ export function TrainingPlansPanel({ teamId, teamName, initialPlayers, repositor
         const entry = detail.entries[index];
         return <View key={entry.id} style={s.card}><Text style={s.subtitle}>{index + 1}. {entry.title}</Text><Text style={s.blue}>Minuto {time.start}–{time.end} · {entry.duration} min</Text><Text style={s.small}>{entry.categories.join(' · ')} · {entry.minPlayers}–{entry.maxPlayers} jugadores · {entry.spaceLength} × {entry.spaceWidth} m</Text><Text style={s.text}>{entry.description}</Text><Text style={s.text}>Material: {entry.materials.map(item => `${item.quantity} ${item.name}`).join(' · ') || 'Sin material'}</Text></View>;
       })}
-      <Text style={s.small}>Las fichas de este plan se conservan como se guardaron, aunque cambie la biblioteca.</Text><Pressable accessibilityRole="button" style={s.primary} disabled={busy} onPress={() => setDetail(null)}><Text style={s.white}>Cerrar plan</Text></Pressable>
+      <Text style={s.small}>Las fichas de este plan se conservan como se guardaron, aunque cambie la biblioteca.</Text><Pressable accessibilityRole="button" style={s.primary} disabled={busy} onPress={closeDetail}><Text style={s.white}>Cerrar plan</Text></Pressable>
     </ScrollView></View></View></Modal>}
   </View>;
 }

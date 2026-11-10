@@ -10,12 +10,12 @@ import { newRecordId } from '../recordId';
 import { TrainingTotals } from './TrainingTotals';
 import { trainingStyles as s } from './trainingStyles';
 
-export function TrainingEditor({ plan, initialPlayers, exercisesRepository, busy, onSave, onClose }: {
-  plan?: TrainingPlan; initialPlayers: number; exercisesRepository: ExercisesRepository; busy: boolean;
+export function TrainingEditor({ plan, initialDate, initialPlayers, exercisesRepository, busy, onSave, onClose }: {
+  plan?: TrainingPlan; initialDate?: string; initialPlayers: number; exercisesRepository: ExercisesRepository; busy: boolean;
   onSave: (plan: TrainingSave) => Promise<void>; onClose: () => void;
 }) {
   const [id] = useState(() => plan?.id ?? newRecordId());
-  const [draft, setDraft] = useState<TrainingDraft>(() => plan ? trainingDraft(plan) : { title: '', date: dateKey(new Date()), playerCount: initialPlayers ? String(initialPlayers) : '', notes: '', entries: [] });
+  const [draft, setDraft] = useState<TrainingDraft>(() => plan ? trainingDraft(plan) : { title: '', date: initialDate ?? dateKey(new Date()), playerCount: initialPlayers ? String(initialPlayers) : '', notes: '', entries: [] });
   const [error, setError] = useState('');
   const [library, setLibrary] = useState<Exercise[] | null>(null);
   const [libraryError, setLibraryError] = useState('');

@@ -3,21 +3,21 @@ import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { isCalendarDate } from '../attendanceReport';
 import { dateKey, formatDateInput } from '../domain';
 
-export function AttendanceDateSearch({ date, disabled, onSelect }: {
-  date: Date; disabled: boolean; onSelect: (date: Date) => void;
+export function AttendanceDateSearch({ date, disabled, onSelect, label = 'Buscar asistencia por fecha', inputLabel = 'Fecha de asistencia' }: {
+  date: Date; disabled: boolean; onSelect: (date: Date) => void; label?: string; inputLabel?: string;
 }) {
   const [value, setValue] = useState(() => dateKey(date));
   const [error, setError] = useState('');
   function search() {
     if (disabled) return;
-    if (!isCalendarDate(value)) { setError('Introduce una fecha válida con el formato AAAA-MM-DD.'); return; }
+    if (!isCalendarDate(value) || value.startsWith('0000')) { setError('Introduce una fecha válida con el formato AAAA-MM-DD.'); return; }
     setError('');
     onSelect(new Date(`${value}T12:00:00`));
   }
   return <View style={s.container}>
-    <Text style={s.label}>Buscar asistencia por fecha</Text>
+    <Text style={s.label}>{label}</Text>
     <View style={s.row}>
-      <TextInput accessibilityLabel="Fecha de asistencia" style={s.input} value={value}
+      <TextInput accessibilityLabel={inputLabel} style={s.input} value={value}
         onChangeText={text => { setValue(formatDateInput(text)); setError(''); }} editable={!disabled}
         placeholder="AAAA-MM-DD" placeholderTextColor="#718096" keyboardType="number-pad"
         maxLength={10} returnKeyType="search" onSubmitEditing={search} />

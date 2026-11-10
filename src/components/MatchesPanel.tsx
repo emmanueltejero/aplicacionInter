@@ -8,10 +8,12 @@ import type { Match } from '../matches';
 import { MatchesSetupRequired } from '../data/matchesRepository';
 import type { MatchesRepository } from '../data/matchesRepository';
 import { MatchEditor } from './MatchEditor';
+import { calendarDate } from '../teamCalendar';
 
 const setupUrl = 'https://github.com/emmanueltejero/aplicacionInter/blob/main/supabase/migrations/202611090002_matches.sql';
-export function MatchesPanel({ teamId, roster, repository }: { teamId: string; roster: Player[]; repository: MatchesRepository }) {
-  const { match_view } = useLocalSearchParams<{ match_view?: string }>();
+export function MatchesPanel({ teamId, roster, repository, onBusyChange }: { teamId: string; roster: Player[]; repository: MatchesRepository; onBusyChange?: (busy: boolean) => void }) {
+  const { match_view, match_id, create_match, calendar_date } = useLocalSearchParams<{ match_view?: string; match_id?: string; create_match?: string; calendar_date?: string }>();
+  const initialDate = calendarDate(calendar_date);
   const totalsView = match_view === 'totals';
   const [matches, setMatches] = useState<Match[] | null>(null);
   const [loadError, setLoadError] = useState<Error | null>(null);
@@ -19,7 +21,9 @@ export function MatchesPanel({ teamId, roster, repository }: { teamId: string; r
   const [attempt, setAttempt] = useState(0);
   const [busy, setBusy] = useState(false);
   const locked = useRef(false);
-  const [editor, setEditor] = useState<{ match?: Match } | null>(null);
+  const [editorState, setEditor] = useState<{ match?: Match } | null>(null);
+  const linkedMatch = matches?.find(item => item.id === match_id);
+  const editor = editorState ?? (linkedMatch ? { match: linkedMatch } : create_match === '1' ? {} : null);
   const [filters, setFilters] = useState(() => initialReportFilters());
   useEffect(() => {
     let active = true;
@@ -27,15 +31,16 @@ export function MatchesPanel({ teamId, roster, repository }: { teamId: string; r
       .catch(cause => { if (active) setLoadError(cause instanceof Error ? cause : new Error('No se pudieron cargar los partidos.')); });
     return () => { active = false; };
   }, [teamId, repository, attempt]);
+  function closeEditor() { setEditor(null); router.setParams({ match_id: undefined, create_match: undefined }); }
   async function save(match: Match) {
     if (locked.current) throw new Error('Espera a que termine el guardado.');
-    locked.current = true; setBusy(true); setSaveError('');
+    locked.current = true; setBusy(true); onBusyChange?.(true); setSaveError('');
     try {
       const saved = await repository.save(teamId, match);
       setMatches(current => (current ?? []).some(item => item.id === saved.id) ? current!.map(item => item.id === saved.id ? saved : item) : [...(current ?? []), saved]);
-      setEditor(null);
+      closeEditor();
     } catch (cause) { const message = cause instanceof Error ? cause.message : 'No se pudo guardar el partido.'; setSaveError(message); throw new Error(message); }
-    finally { locked.current = false; setBusy(false); }
+    finally { locked.current = false; setBusy(false); onBusyChange?.(false); }
   }
   const today = dateKey(new Date());
   const totals = useMemo(() => {
@@ -53,6 +58,7 @@ export function MatchesPanel({ teamId, roster, repository }: { teamId: string; r
     <Text style={s.title}>Partidos y minutos</Text>
     <View style={s.controls}>{[{ value: 'list', label: 'Listado' }, { value: 'totals', label: 'Totales por jugador' }].map(item => <Pressable key={item.value} accessibilityRole="tab" accessibilityState={{ selected: totalsView === (item.value === 'totals') }} style={s.secondary} onPress={() => router.setParams({ match_view: item.value })}><Text style={s.blue}>{item.label}</Text></Pressable>)}</View>
     {!!saveError && <Text accessibilityRole="alert" style={s.error}>{saveError}</Text>}
+    {!!match_id && !linkedMatch && <Text accessibilityRole="alert" style={s.error}>Este partido ya no está disponible en este equipo. Vuelve al calendario y actualízalo.</Text>}
     {totalsView ? <>
       <Text style={s.text}>Solo se suman partidos marcados como disputados y con fecha hasta hoy. Los minutos vacíos quedan pendientes, no se consideran cero.</Text>
       <View style={s.controls}><Pressable accessibilityRole="button" style={s.secondary} onPress={() => setFilters(initialReportFilters())}><Text style={s.blue}>Este mes</Text></Pressable><Pressable accessibilityRole="button" style={s.secondary} onPress={() => setFilters({ ...filters, from: '', to: '' })}><Text style={s.blue}>Todo el historial</Text></Pressable></View>
@@ -69,7 +75,7 @@ export function MatchesPanel({ teamId, roster, repository }: { teamId: string; r
         <Pressable accessibilityRole="button" accessibilityLabel={`Editar partido contra ${match.opponent}`} style={s.secondary} disabled={busy} onPress={() => setEditor({ match })}><Text style={s.blue}>Convocatoria y minutos</Text></Pressable>
       </View>)}
     </>}
-    {editor && <MatchEditor match={editor.match} roster={roster} busy={busy} onSave={save} onClose={() => setEditor(null)} />}
+    {editor && <MatchEditor match={editor.match} initialDate={initialDate ? dateKey(initialDate) : undefined} roster={roster} busy={busy} onSave={save} onClose={closeEditor} />}
   </View>;
 }
 const s = StyleSheet.create({ container: { gap: 12 }, title: { color: '#17212D', fontSize: 21, fontWeight: '700' }, controls: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 }, field: { flex: 1, minWidth: 100, gap: 4 }, input: { minHeight: 48, borderWidth: 1, borderColor: '#DAE2EB', borderRadius: 8, padding: 10, backgroundColor: '#FFF', color: '#17212D', fontSize: 14 }, primary: { minHeight: 48, borderRadius: 8, backgroundColor: '#176BA0', alignItems: 'center', justifyContent: 'center', padding: 12 }, white: { color: '#FFF', fontWeight: '700' }, secondary: { minHeight: 44, padding: 10, borderWidth: 1, borderColor: '#DAE2EB', backgroundColor: '#FFF', borderRadius: 8, justifyContent: 'center', alignItems: 'center' }, blue: { color: '#176BA0', fontWeight: '600', fontSize: 13 }, text: { color: '#5D6D7E', fontSize: 13, lineHeight: 21 }, small: { color: '#718096', fontSize: 11, lineHeight: 18 }, card: { borderWidth: 1, borderColor: '#DFE5EC', backgroundColor: '#FFF', borderRadius: 14, padding: 16, gap: 8 }, name: { flex: 1, color: '#17212D', fontSize: 16, fontWeight: '600' }, heading: { flexDirection: 'row', gap: 10, alignItems: 'center' }, minutes: { color: '#176BA0', fontSize: 19, fontWeight: '700' }, error: { color: '#A52D38', fontSize: 13, lineHeight: 20 } });
