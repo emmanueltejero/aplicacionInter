@@ -82,3 +82,13 @@ Mientras no se aplique la ampliación, la pestaña Partidos muestra las instrucc
 Un campo de minutos vacío significa pendiente; `0` indica convocado sin jugar. Los totales solo incluyen partidos marcados como disputados, no futuros y dentro de las fechas elegidas. Se muestran convocatorias, participaciones con minutos positivos, minutos conocidos y registros pendientes. Los minutos guardados de partidos que vuelven a marcarse pendientes se conservan, pero no se suman hasta que vuelvan a estar disputados.
 
 Las pruebas locales ejecutan ambas migraciones en PGlite y comprueban permisos, rechazo de escrituras directas, reintentos, validaciones y conservación del historial. La entrega real requiere aplicar esta ampliación en el proyecto remoto y probar un guardado desde una cuenta del club. La clave pública no permite ejecutar migraciones; no se solicita una clave privilegiada para este paso.
+
+## Activar la biblioteca compartida de ejercicios
+
+Ejecuta `migrations/202611100001_exercises.sql` en **SQL Editor → New query → Run** y abre **Ejercicios → Reintentar biblioteca** en la aplicación. Se puede repetir sin borrar los ejercicios existentes. Esta ampliación crea `exercises` y sus funciones y permisos; no cambia las tablas de equipos, jugadores, asistencia ni partidos. No carga los ejemplos ficticios de la demo en las cuentas reales.
+
+Todo miembro activo del club puede leer la biblioteca completa y añadir ejercicios, incluso sin equipo asignado. Solo el autor y un administrador activo pueden modificar, archivar o restaurar. `created_by` se obtiene de la sesión autenticada en el servidor: el cliente no puede asignar otro autor. Si se elimina la cuenta de un autor, su ejercicio se conserva y los administradores pueden mantenerlo. Las cuentas deshabilitadas, sin membresía o anónimas no tienen acceso.
+
+La tabla solo concede lectura a los clientes; todas las escrituras se realizan mediante `save_exercise`, que valida los campos y comprueba la revisión antes de actualizar. Los reintentos idénticos no duplican ejercicios ni incrementan otra vez su revisión. Si otro editor ya cambió la ficha, la aplicación indica que hay que cerrarla y actualizar la biblioteca. Archivar es reversible y conserva el contenido.
+
+Las pruebas en PGlite ejecutan todas las ampliaciones, repiten esta migración sobre datos existentes y comprueban que dos entrenadores con equipos distintos comparten la lectura, que solo autor/admin escriben y que las restricciones no se pueden saltar mediante peticiones directas. Las pruebas de navegador usan datos ficticios y respuestas simuladas. Tras la activación real, verifica desde tu cuenta la creación y persistencia de un ejercicio y, desde otra cuenta de entrenador, su lectura sin botones de edición ajena.

@@ -4,12 +4,15 @@ import { parseRegister, parseRoster, validatePlayer } from '../domain';
 import type { Attendance, Player, Register } from '../domain';
 import { demoMatchesRepository, remoteMatchesRepository } from './matchesRepository';
 import type { MatchesRepository } from './matchesRepository';
+import { demoExercisesRepository, remoteExercisesRepository } from './exercisesRepository';
+import type { ExercisesRepository } from './exercisesRepository';
 
 export type Team = { id: string; name: string };
 export type TeamData = { roster: Player[]; register: Register };
 export interface ClubRepository {
   readonly demo: boolean;
   readonly matches: MatchesRepository;
+  readonly exercises: ExercisesRepository;
   teams(): Promise<Team[]>;
   load(teamId: string): Promise<TeamData>;
   savePlayer(teamId: string, data: { name: string; number: number }, id?: string): Promise<Player>;
@@ -27,6 +30,7 @@ function requireDemoTeam(teamId: string) {
 export const demoRepository: ClubRepository = {
   demo: true,
   matches: demoMatchesRepository,
+  exercises: demoExercisesRepository,
   async teams() { return [{ id: DEMO_TEAM, name: 'Equipo de prueba' }]; },
   async load(teamId) {
     requireDemoTeam(teamId);
@@ -89,6 +93,7 @@ export function remoteRepository(client: SupabaseClient): ClubRepository {
   return {
     demo: false,
     matches: remoteMatchesRepository(client),
+    exercises: remoteExercisesRepository(client),
     async teams() {
       const { data, error } = await client.from('teams').select('id,name').order('name');
       check(error); return data ?? [];

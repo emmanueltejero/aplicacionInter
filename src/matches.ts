@@ -1,4 +1,5 @@
 import type { Player } from './domain';
+export { newRecordId as newMatchId } from './recordId.js';
 
 export type MatchEntry = { playerId: string; minutes: number | null };
 export type Match = { id: string; date: string; opponent: string; duration: number; venue: 'home' | 'away'; played: boolean; players: MatchEntry[] };
@@ -6,14 +7,6 @@ export type MatchDraft = Omit<Match, 'duration' | 'players'> & { duration: strin
 const validDate = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value)
   && Number.isFinite(Date.parse(`${value}T00:00:00Z`)) && new Date(`${value}T00:00:00Z`).toISOString().slice(0, 10) === value;
 
-// Record identifiers are not credentials; authorization is enforced by Supabase.
-export function newMatchId(): string {
-  if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, char => {
-    const value = Math.floor(Math.random() * 16);
-    return (char === 'x' ? value : (value & 3) | 8).toString(16);
-  });
-}
 export function validateMatch(draft: MatchDraft, roster: Player[], previous: Match | undefined, today: string): Match {
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(draft.id)) throw new Error('El identificador del partido no es válido.');
   if (!validDate(draft.date)) throw new Error('Introduce una fecha válida con el formato AAAA-MM-DD.');

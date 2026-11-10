@@ -9,6 +9,7 @@ import { PlayerEditor } from '../components/PlayerEditor';
 import { PlayerSummary } from '../components/PlayerSummary';
 import { MatchesPanel } from '../components/MatchesPanel';
 import { AttendanceDateSearch } from '../components/AttendanceDateSearch';
+import { ExercisesLibrary } from '../components/ExercisesLibrary';
 
 const options: { value: Attendance; label: string; short: string; color: string; bg: string }[] = [
   { value: 'present', label: 'Presente', short: 'Sí', color: '#176BA0', bg: '#DEEEFB' },
@@ -20,7 +21,7 @@ export default function TeamScreen({ team, teams, repository, onLeave }: {
   team: Team; teams: Team[]; repository: ClubRepository; onLeave: () => Promise<void>;
 }) {
   const { view } = useLocalSearchParams<{ view?: string }>();
-  const tab = view === 'team' ? 'team' : view === 'summary' ? 'summary' : view === 'matches' ? 'matches' : 'attendance';
+  const tab = view === 'team' ? 'team' : view === 'summary' ? 'summary' : view === 'matches' ? 'matches' : view === 'exercises' ? 'exercises' : 'attendance';
   const [date, setDate] = useState(() => new Date());
   const [register, setRegister] = useState<Register>({});
   const [roster, setRoster] = useState<Player[]>([]);
@@ -100,7 +101,7 @@ export default function TeamScreen({ team, teams, repository, onLeave }: {
         <Text style={styles.subtitle}>El día a día del equipo, en un mismo lugar.</Text>
         <View style={styles.teamCard}><View><Text style={styles.teamName}>{team.name}</Text><Text style={styles.muted}>{activePlayers.length} jugadores activos{repository.demo ? ' · Datos ficticios' : ''}</Text></View><Text style={styles.ball}>⚽</Text></View>
         <View style={styles.tabs}>
-          {([{ id: 'attendance', label: 'Pasar lista' }, { id: 'team', label: 'Plantilla' }, { id: 'summary', label: 'Resumen' }, { id: 'matches', label: 'Partidos' }] as const).map(item => (
+          {([{ id: 'attendance', label: 'Pasar lista' }, { id: 'team', label: 'Plantilla' }, { id: 'summary', label: 'Resumen' }, { id: 'matches', label: 'Partidos' }, { id: 'exercises', label: 'Ejercicios' }] as const).map(item => (
             <Pressable key={item.id} accessibilityRole="tab" accessibilityState={{ selected: tab === item.id }} disabled={saving} onPress={() => router.setParams({ view: item.id })} style={[styles.tab, tab === item.id && styles.tabActive]}><Text style={[styles.tabText, tab === item.id && styles.tabTextActive]}>{item.label}</Text></Pressable>
           ))}
         </View>
@@ -122,7 +123,7 @@ export default function TeamScreen({ team, teams, repository, onLeave }: {
               {!!day[player.id] && !player.archivedAt && <Pressable accessibilityRole="button" accessibilityLabel={`Quitar marca de ${player.name}`} disabled={saving} style={styles.clearMark} onPress={() => { void mutate(() => repository.clearAttendance(team.id, key, player.id)).catch(() => {}); }}><Text style={styles.today}>Quitar marca</Text></Pressable>}
             </View>)}</View>
           </>}
-        </> : tab === 'matches' ? <>
+        </> : tab === 'exercises' ? <ExercisesLibrary repository={repository.exercises} onBusyChange={setSaving} /> : tab === 'matches' ? <>
           {loading ? <ActivityIndicator accessibilityLabel="Cargando equipo" /> : loadError ? <View style={styles.error}><Text>No se pudo cargar la plantilla.</Text><Pressable accessibilityRole="button" onPress={() => { setLoading(true); void load(); }}><Text style={styles.today}>Reintentar</Text></Pressable></View> : <MatchesPanel teamId={team.id} roster={roster} repository={repository.matches} />}
         </> : tab === 'summary' ? <>
           {loading ? <ActivityIndicator accessibilityLabel="Cargando resumen" /> : loadError ? <View style={styles.error}><Text>No se pudo cargar el resumen.</Text><Pressable accessibilityRole="button" onPress={() => { setLoading(true); void load(); }}><Text style={styles.today}>Reintentar</Text></Pressable></View> : <PlayerSummary teamId={team.id} roster={roster} register={register} filters={reportFilters} onChange={setReportFilters} repository={repository.matches} />}
@@ -139,7 +140,7 @@ export default function TeamScreen({ team, teams, repository, onLeave }: {
             {showArchived && <View style={styles.list}>{archivedPlayers.map(player => <View key={player.id} style={styles.playerRow}><Text style={styles.playerName}>{player.name} · #{player.number}</Text><Pressable accessibilityRole="button" accessibilityLabel={`Restaurar a ${player.name}`} disabled={saving} style={styles.action} onPress={() => archive(player, false)}><Text style={styles.today}>Restaurar jugador</Text></Pressable></View>)}</View>}
           </>}
         </>}
-        <View style={styles.next}><Text style={styles.nextTitle}>Lo siguiente, juntos</Text><Text style={styles.nextText}>Biblioteca de ejercicios compartida y planificación de entrenamientos.</Text></View>
+        <View style={styles.next}><Text style={styles.nextTitle}>Lo siguiente, juntos</Text><Text style={styles.nextText}>Planificar entrenamientos diarios con los ejercicios de la biblioteca.</Text></View>
         <Text style={styles.footer}>{repository.demo ? 'Demo con datos ficticios. Los cambios se guardan solo en este dispositivo.' : 'Acceso privado del club. Los cambios se guardan en el servidor; hace falta conexión.'}</Text>
       </ScrollView>
       {editor && <PlayerEditor key={editor.player?.id ?? 'new'} player={editor.player} roster={roster} busy={saving} onSave={savePlayer} onClose={() => setEditor(null)} />}
@@ -170,8 +171,8 @@ const styles = StyleSheet.create({
   teamCard: { padding: 20, backgroundColor: '#FFF', borderRadius: 16, marginVertical: 24, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderWidth: 1, borderColor: '#DFE5EC' },
   teamName: { color: '#17212D', fontSize: 18, fontWeight: '700', marginBottom: 7 },
   muted: { color: '#5D6D7E', fontSize: 12 }, ball: { fontSize: 28 },
-  tabs: { flexDirection: 'row', borderBottomWidth: 1, borderColor: '#D7E0EA', marginBottom: 25 },
-  tab: { flex: 1, minHeight: 48, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6, paddingBottom: 13, paddingTop: 5, borderBottomWidth: 3, borderColor: 'transparent' },
+  tabs: { flexDirection: 'row', flexWrap: 'wrap', borderBottomWidth: 1, borderColor: '#D7E0EA', marginBottom: 25 },
+  tab: { flex: 1, minWidth: 90, minHeight: 48, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6, paddingBottom: 13, paddingTop: 5, borderBottomWidth: 3, borderColor: 'transparent' },
   tabActive: { borderColor: '#176BA0' }, tabText: { fontSize: 15, fontWeight: '600', color: '#607184' }, tabTextActive: { color: '#176BA0' },
   sectionHeading: { gap: 8, marginBottom: 16 }, sectionTitle: { fontSize: 19, fontWeight: '700', color: '#17212D' },
   small: { fontSize: 10, color: '#61758A', fontWeight: '600', letterSpacing: 0.5 },

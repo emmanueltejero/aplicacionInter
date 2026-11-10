@@ -11,6 +11,7 @@ import TeamScreen from './TeamScreen';
 import { describeAuthFailure } from '../authError';
 import { hasRecoveryIntent, PASSWORD_RECOVERY_REDIRECT } from '../passwordRecovery';
 import PasswordResetScreen from './PasswordResetScreen';
+import { ExercisesLibrary } from '../components/ExercisesLibrary';
 
 export default function EntryScreen() {
   const [initialRecoveryState] = useState(() => {
@@ -116,10 +117,11 @@ export default function EntryScreen() {
   </ScrollView></SafeAreaView>;
 }
 function TeamHub({ repository, onLeave }: { repository: ClubRepository; onLeave: () => Promise<void> }) {
-  const { team: teamParam } = useLocalSearchParams<{ team?: string }>();
+  const { team: teamParam, view } = useLocalSearchParams<{ team?: string; view?: string }>();
   const [teams, setTeams] = useState<Team[] | null>(null);
   const [error, setError] = useState('');
   const [attempt, setAttempt] = useState(0);
+  const [libraryBusy, setLibraryBusy] = useState(false);
   useEffect(() => {
     let active = true;
     repository.teams().then(data => { if (active) { setTeams(data); setError(''); } }).catch(() => { if (active) setError('No se pudieron cargar los equipos.'); });
@@ -127,12 +129,18 @@ function TeamHub({ repository, onLeave }: { repository: ClubRepository; onLeave:
   }, [repository, attempt]);
   const team = teams?.find(item => item.id === teamParam) ?? (teams?.length === 1 ? teams[0] : null);
   if (team && teams) return <TeamScreen key={team.id} team={team} teams={teams} repository={repository} onLeave={onLeave} />;
+  if (view === 'exercises') return <SafeAreaView style={s.safe}><ScrollView contentContainerStyle={s.libraryContent}>
+    <Text style={s.title}>Inter Playa Honda</Text>
+    <Pressable accessibilityRole="button" disabled={libraryBusy} style={s.secondary} onPress={() => router.setParams({ view: undefined })}><Text style={s.link}>Volver a mis equipos</Text></Pressable>
+    <ExercisesLibrary repository={repository.exercises} onBusyChange={setLibraryBusy} />
+  </ScrollView></SafeAreaView>;
   return <SafeAreaView style={s.safe}><View style={s.content}><Text style={s.title}>Mis equipos</Text>
     {!teams && !error && <ActivityIndicator accessibilityLabel="Cargando equipos" />}
     {!!error && <><Text style={s.error}>{error}</Text><Pressable accessibilityRole="button" style={s.secondary} onPress={() => setAttempt(value => value + 1)}><Text>Reintentar</Text></Pressable></>}
     {teams?.length === 0 && <Text style={s.text}>No tienes equipos asignados. Pide al administrador del club que revise tu acceso.</Text>}
     {teams?.map(item => <Pressable accessibilityRole="button" key={item.id} style={s.secondary} onPress={() => router.setParams({ team: item.id })}><Text style={s.link}>{item.name}</Text></Pressable>)}
+    {teams && <Pressable accessibilityRole="button" style={s.secondary} onPress={() => router.setParams({ view: 'exercises' })}><Text style={s.link}>Biblioteca compartida de ejercicios</Text></Pressable>}
     <Pressable accessibilityRole="button" style={s.secondary} onPress={() => { void onLeave().catch(() => setError('No se pudo cerrar la sesión.')); }}><Text>Salir</Text></Pressable>
   </View></SafeAreaView>;
 }
-const s = StyleSheet.create({ diagnostic: { fontSize: 12, color: '#5D6D7E' }, version: { fontSize: 11, textAlign: 'center', color: '#718096', marginTop: 8 }, safe: { flex: 1, backgroundColor: '#F4F6F9' }, content: { flexGrow: 1, justifyContent: 'center', width: '100%', maxWidth: 520, alignSelf: 'center', padding: 24 }, card: { backgroundColor: '#FFF', borderRadius: 18, padding: 24, borderWidth: 1, borderColor: '#DFE5EC', gap: 12 }, crest: { width: 88, height: 88, alignSelf: 'center' }, kicker: { color: '#176BA0', fontSize: 11, fontWeight: '700', letterSpacing: 1.3, textAlign: 'center' }, title: { color: '#17212D', fontSize: 26, fontWeight: '800', marginBottom: 4 }, text: { color: '#5D6D7E', fontSize: 13, lineHeight: 21 }, label: { fontSize: 13, color: '#17212D', fontWeight: '600' }, input: { minHeight: 48, padding: 12, borderWidth: 1, borderColor: '#DAE2EB', borderRadius: 8, color: '#17212D' }, button: { minHeight: 48, backgroundColor: '#176BA0', borderRadius: 8, justifyContent: 'center', alignItems: 'center', padding: 10 }, white: { color: '#FFF', fontWeight: '700' }, secondary: { minHeight: 48, padding: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#DAE2EB', borderRadius: 8, marginTop: 8 }, link: { color: '#176BA0', fontWeight: '600' }, error: { color: '#A52D38', fontSize: 13, lineHeight: 20 }, notice: { backgroundColor: '#E5EFF8', padding: 12, color: '#24445F', lineHeight: 20, fontSize: 13 }, disabled: { opacity: 0.5 } });
+const s = StyleSheet.create({ libraryContent: { width: '100%', maxWidth: 800, alignSelf: 'center', padding: 20, gap: 20 }, diagnostic: { fontSize: 12, color: '#5D6D7E' }, version: { fontSize: 11, textAlign: 'center', color: '#718096', marginTop: 8 }, safe: { flex: 1, backgroundColor: '#F4F6F9' }, content: { flexGrow: 1, justifyContent: 'center', width: '100%', maxWidth: 520, alignSelf: 'center', padding: 24 }, card: { backgroundColor: '#FFF', borderRadius: 18, padding: 24, borderWidth: 1, borderColor: '#DFE5EC', gap: 12 }, crest: { width: 88, height: 88, alignSelf: 'center' }, kicker: { color: '#176BA0', fontSize: 11, fontWeight: '700', letterSpacing: 1.3, textAlign: 'center' }, title: { color: '#17212D', fontSize: 26, fontWeight: '800', marginBottom: 4 }, text: { color: '#5D6D7E', fontSize: 13, lineHeight: 21 }, label: { fontSize: 13, color: '#17212D', fontWeight: '600' }, input: { minHeight: 48, padding: 12, borderWidth: 1, borderColor: '#DAE2EB', borderRadius: 8, color: '#17212D' }, button: { minHeight: 48, backgroundColor: '#176BA0', borderRadius: 8, justifyContent: 'center', alignItems: 'center', padding: 10 }, white: { color: '#FFF', fontWeight: '700' }, secondary: { minHeight: 48, padding: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#DAE2EB', borderRadius: 8, marginTop: 8 }, link: { color: '#176BA0', fontWeight: '600' }, error: { color: '#A52D38', fontSize: 13, lineHeight: 20 }, notice: { backgroundColor: '#E5EFF8', padding: 12, color: '#24445F', lineHeight: 20, fontSize: 13 }, disabled: { opacity: 0.5 } });
