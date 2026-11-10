@@ -18,8 +18,8 @@ const options: { value: Attendance; label: string; short: string; color: string;
   { value: 'excused', label: 'Justificado', short: 'Just.', color: '#855A0D', bg: '#FFF2CE' },
 ];
 
-export default function TeamScreen({ team, teams, repository, onLeave }: {
-  team: Team; teams: Team[]; repository: ClubRepository; onLeave: () => Promise<void>;
+export default function TeamScreen({ team, teams, repository, onLeave, isAdmin = false }: {
+  team: Team; teams: Team[]; repository: ClubRepository; onLeave: () => Promise<void>; isAdmin?: boolean;
 }) {
   const { view } = useLocalSearchParams<{ view?: string }>();
   const tab = view === 'team' ? 'team' : view === 'summary' ? 'summary' : view === 'matches' ? 'matches' : view === 'exercises' ? 'exercises' : view === 'training' ? 'training' : 'attendance';
@@ -92,6 +92,7 @@ export default function TeamScreen({ team, teams, repository, onLeave }: {
         <View style={styles.headerInner}>
           <View style={styles.brand}><View style={styles.badge}><Image source={require('../../assets/club-crest.jpg')} style={styles.crest} resizeMode="contain" accessibilityLabel="Escudo del Inter Playa Honda" /></View><View style={styles.brandCopy}><Text style={styles.eyebrow}>ÁREA DE ENTRENADORES</Text><Text style={styles.club}>Inter Playa Honda</Text></View></View>
           <View style={styles.demoPill}><Text style={styles.demoText}>{repository.demo ? 'DEMOSTRACIÓN' : 'ACCESO DEL CLUB'}</Text></View>
+          {isAdmin && <Pressable accessibilityRole="button" accessibilityLabel="Gestionar usuarios" disabled={saving} style={styles.exit} onPress={() => router.setParams({ view: 'users' })}><Text style={styles.demoText}>Usuarios del club</Text></Pressable>}
           <Pressable accessibilityRole="button" disabled={saving} onPress={() => { void onLeave().catch(() => setError('No se pudo cerrar la sesión. Inténtalo de nuevo.')); }} style={styles.exit}><Text style={styles.demoText}>{repository.demo ? 'Salir de la demo' : 'Cerrar sesión'}</Text></Pressable>
         </View>
       </View>

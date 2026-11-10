@@ -12,6 +12,7 @@ import { describeAuthFailure } from '../authError';
 import { hasRecoveryIntent, PASSWORD_RECOVERY_REDIRECT } from '../passwordRecovery';
 import PasswordResetScreen from './PasswordResetScreen';
 import { ExercisesLibrary } from '../components/ExercisesLibrary';
+import { UsersPanel } from '../components/UsersPanel';
 
 export default function EntryScreen() {
   const [initialRecoveryState] = useState(() => {
@@ -122,13 +123,27 @@ function TeamHub({ repository, onLeave }: { repository: ClubRepository; onLeave:
   const [error, setError] = useState('');
   const [attempt, setAttempt] = useState(0);
   const [libraryBusy, setLibraryBusy] = useState(false);
+  const [admin, setAdmin] = useState<boolean | null>(null);
+  const [adminError, setAdminError] = useState(false);
+  const [adminAttempt, setAdminAttempt] = useState(0);
   useEffect(() => {
     let active = true;
     repository.teams().then(data => { if (active) { setTeams(data); setError(''); } }).catch(() => { if (active) setError('No se pudieron cargar los equipos.'); });
     return () => { active = false; };
   }, [repository, attempt]);
+  useEffect(() => {
+    let active = true;
+    repository.users.isAdmin().then(value => { if (active) { setAdmin(value); setAdminError(false); } })
+      .catch(() => { if (active) { setAdmin(false); setAdminError(true); } });
+    return () => { active = false; };
+  }, [repository, adminAttempt]);
   const team = teams?.find(item => item.id === teamParam) ?? (teams?.length === 1 ? teams[0] : null);
-  if (team && teams) return <TeamScreen key={team.id} team={team} teams={teams} repository={repository} onLeave={onLeave} />;
+  if (view === 'users') return <SafeAreaView style={s.safe}><ScrollView contentContainerStyle={s.libraryContent}>
+    <Text style={s.title}>Inter Playa Honda</Text>
+    <Pressable accessibilityRole="button" disabled={libraryBusy} style={s.secondary} onPress={() => router.setParams({ view: 'attendance' })}><Text style={s.link}>Volver al equipo</Text></Pressable>
+    {admin === null ? <ActivityIndicator accessibilityLabel="Comprobando acceso de administración" /> : adminError ? <><Text accessibilityRole="alert" style={s.error}>No se pudo comprobar tu acceso de administrador.</Text><Pressable accessibilityRole="button" style={s.secondary} onPress={() => { setAdmin(null); setAdminError(false); setAdminAttempt(value => value + 1); }}><Text style={s.link}>Reintentar acceso de administrador</Text></Pressable></> : admin ? <UsersPanel repository={repository.users} onBusyChange={setLibraryBusy} onTeamsChanged={created => setTeams(current => [...(current ?? []).filter(item => item.id !== created.id), created].sort((a, b) => a.name.localeCompare(b.name, 'es')))} /> : <Text style={s.text}>Este apartado está disponible solo para los administradores del club.</Text>}
+  </ScrollView></SafeAreaView>;
+  if (team && teams) return <TeamScreen key={team.id} team={team} teams={teams} repository={repository} onLeave={onLeave} isAdmin={admin === true} />;
   if (view === 'exercises') return <SafeAreaView style={s.safe}><ScrollView contentContainerStyle={s.libraryContent}>
     <Text style={s.title}>Inter Playa Honda</Text>
     <Pressable accessibilityRole="button" disabled={libraryBusy} style={s.secondary} onPress={() => router.setParams({ view: undefined })}><Text style={s.link}>Volver a mis equipos</Text></Pressable>
@@ -140,6 +155,7 @@ function TeamHub({ repository, onLeave }: { repository: ClubRepository; onLeave:
     {teams?.length === 0 && <Text style={s.text}>No tienes equipos asignados. Pide al administrador del club que revise tu acceso.</Text>}
     {teams?.map(item => <Pressable accessibilityRole="button" key={item.id} style={s.secondary} onPress={() => router.setParams({ team: item.id })}><Text style={s.link}>{item.name}</Text></Pressable>)}
     {teams && <Pressable accessibilityRole="button" style={s.secondary} onPress={() => router.setParams({ view: 'exercises' })}><Text style={s.link}>Biblioteca compartida de ejercicios</Text></Pressable>}
+    {admin && <Pressable accessibilityRole="button" style={s.secondary} onPress={() => router.setParams({ view: 'users' })}><Text style={s.link}>Usuarios del club</Text></Pressable>}
     <Pressable accessibilityRole="button" style={s.secondary} onPress={() => { void onLeave().catch(() => setError('No se pudo cerrar la sesión.')); }}><Text>Salir</Text></Pressable>
   </View></SafeAreaView>;
 }

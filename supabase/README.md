@@ -31,7 +31,7 @@ Después, inicia sesión en la aplicación. Una cuenta creada en Authentication 
 
 ## 4. Dar de alta entrenadores y equipos
 
-Por ahora se gestionan desde el panel de Supabase (el panel administrativo en la app es trabajo futuro):
+Puedes gestionarlos desde **Usuarios del club** después de completar [la activación de usuarios desde la web](WEB-USERS.md). Para hacerlo manualmente desde el panel de Supabase:
 
 1. Crea el usuario en Authentication. Comparte sus credenciales por un canal seguro; no uses el repositorio ni este chat para contraseñas.
 2. En Table Editor, añade `club_members` con su `user_id`, `role=coach`, `enabled=true`.
@@ -112,3 +112,7 @@ Ejecuta `migrations/202611100003_copy_training_plans.sql` en **SQL Editor → Ne
 La función comprueba que el usuario sigue autorizado para el equipo y que el plan original pertenece a ese mismo equipo. Conserva la revisión elegida y copia las fichas históricas en orden, con identificadores nuevos de bloque. La copia empieza activa, con revisión 1 y el usuario actual como autor, incluso si el original está archivado. No consulta la biblioteca ni acepta cantidades o descripciones nuevas desde el cliente.
 
 Si se pierde una respuesta, el mismo identificador devuelve la copia ya creada sin duplicarla, aunque después haya cambiado el original. Si la copia ya se ha editado o el origen estaba desactualizado antes de crearla, se rechaza el intento para evitar sobrescribir datos. Los entrenadores de otros equipos, usuarios deshabilitados o sin membresía y cuentas anónimas no pueden utilizar la función. Las pruebas ejecutan esta ampliación sobre todas las anteriores, la repiten con copias existentes y verifican permisos, independencia, fichas archivadas, conflictos y reintentos.
+
+## Activar las altas de usuarios desde la web
+
+Sigue [WEB-USERS.md](WEB-USERS.md). Requiere `migrations/202611100004_web_users.sql` y la función Edge `club-users`. El SQL no cambia las cuentas existentes; añade un trigger de aprovisionamiento, el directorio exclusivo de administradores y la creación autorizada de equipos. La función verifica sesión, administrador activo y preparación del SQL antes de llamar a la API Admin de Auth. Las cuentas nuevas reciben membresía `coach` y todas las asignaciones en la transacción de creación de Auth. No se exponen claves privadas en la web ni se concede acceso de escritura directo a `club_members` o `team_coaches`.

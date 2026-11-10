@@ -1,0 +1,5 @@
+# This function verifies the user's JWT with Auth and the current admin
+# membership itself. The gateway legacy JWT check does not accept every
+# signing-key configuration; it must not replace the in-function checks.
+[functions.club-users]
+verify_jwt = false

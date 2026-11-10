@@ -8,6 +8,8 @@ import { demoExercisesRepository, remoteExercisesRepository } from './exercisesR
 import type { ExercisesRepository } from './exercisesRepository';
 import { demoTrainingRepository, remoteTrainingRepository } from './trainingRepository';
 import type { TrainingRepository } from './trainingRepository';
+import { demoUsersRepository, remoteUsersRepository } from './usersRepository';
+import type { UsersRepository } from './usersRepository';
 
 export type Team = { id: string; name: string };
 export type TeamData = { roster: Player[]; register: Register };
@@ -16,6 +18,7 @@ export interface ClubRepository {
   readonly matches: MatchesRepository;
   readonly exercises: ExercisesRepository;
   readonly training: TrainingRepository;
+  readonly users: UsersRepository;
   teams(): Promise<Team[]>;
   load(teamId: string): Promise<TeamData>;
   savePlayer(teamId: string, data: { name: string; number: number }, id?: string): Promise<Player>;
@@ -35,6 +38,7 @@ export const demoRepository: ClubRepository = {
   matches: demoMatchesRepository,
   exercises: demoExercisesRepository,
   training: demoTrainingRepository,
+  users: demoUsersRepository,
   async teams() { return [{ id: DEMO_TEAM, name: 'Equipo de prueba' }]; },
   async load(teamId) {
     requireDemoTeam(teamId);
@@ -99,6 +103,7 @@ export function remoteRepository(client: SupabaseClient): ClubRepository {
     matches: remoteMatchesRepository(client),
     exercises: remoteExercisesRepository(client),
     training: remoteTrainingRepository(client),
+    users: remoteUsersRepository(client),
     async teams() {
       const { data, error } = await client.from('teams').select('id,name').order('name');
       check(error); return data ?? [];
