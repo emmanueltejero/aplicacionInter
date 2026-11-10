@@ -10,6 +10,7 @@ import { PlayerSummary } from '../components/PlayerSummary';
 import { MatchesPanel } from '../components/MatchesPanel';
 import { AttendanceDateSearch } from '../components/AttendanceDateSearch';
 import { ExercisesLibrary } from '../components/ExercisesLibrary';
+import { TrainingPlansPanel } from '../components/TrainingPlansPanel';
 
 const options: { value: Attendance; label: string; short: string; color: string; bg: string }[] = [
   { value: 'present', label: 'Presente', short: 'Sí', color: '#176BA0', bg: '#DEEEFB' },
@@ -21,7 +22,7 @@ export default function TeamScreen({ team, teams, repository, onLeave }: {
   team: Team; teams: Team[]; repository: ClubRepository; onLeave: () => Promise<void>;
 }) {
   const { view } = useLocalSearchParams<{ view?: string }>();
-  const tab = view === 'team' ? 'team' : view === 'summary' ? 'summary' : view === 'matches' ? 'matches' : view === 'exercises' ? 'exercises' : 'attendance';
+  const tab = view === 'team' ? 'team' : view === 'summary' ? 'summary' : view === 'matches' ? 'matches' : view === 'exercises' ? 'exercises' : view === 'training' ? 'training' : 'attendance';
   const [date, setDate] = useState(() => new Date());
   const [register, setRegister] = useState<Register>({});
   const [roster, setRoster] = useState<Player[]>([]);
@@ -101,7 +102,7 @@ export default function TeamScreen({ team, teams, repository, onLeave }: {
         <Text style={styles.subtitle}>El día a día del equipo, en un mismo lugar.</Text>
         <View style={styles.teamCard}><View><Text style={styles.teamName}>{team.name}</Text><Text style={styles.muted}>{activePlayers.length} jugadores activos{repository.demo ? ' · Datos ficticios' : ''}</Text></View><Text style={styles.ball}>⚽</Text></View>
         <View style={styles.tabs}>
-          {([{ id: 'attendance', label: 'Pasar lista' }, { id: 'team', label: 'Plantilla' }, { id: 'summary', label: 'Resumen' }, { id: 'matches', label: 'Partidos' }, { id: 'exercises', label: 'Ejercicios' }] as const).map(item => (
+          {([{ id: 'attendance', label: 'Pasar lista' }, { id: 'team', label: 'Plantilla' }, { id: 'summary', label: 'Resumen' }, { id: 'matches', label: 'Partidos' }, { id: 'exercises', label: 'Ejercicios' }, { id: 'training', label: 'Entrenar' }] as const).map(item => (
             <Pressable key={item.id} accessibilityRole="tab" accessibilityState={{ selected: tab === item.id }} disabled={saving} onPress={() => router.setParams({ view: item.id })} style={[styles.tab, tab === item.id && styles.tabActive]}><Text style={[styles.tabText, tab === item.id && styles.tabTextActive]}>{item.label}</Text></Pressable>
           ))}
         </View>
@@ -123,6 +124,8 @@ export default function TeamScreen({ team, teams, repository, onLeave }: {
               {!!day[player.id] && !player.archivedAt && <Pressable accessibilityRole="button" accessibilityLabel={`Quitar marca de ${player.name}`} disabled={saving} style={styles.clearMark} onPress={() => { void mutate(() => repository.clearAttendance(team.id, key, player.id)).catch(() => {}); }}><Text style={styles.today}>Quitar marca</Text></Pressable>}
             </View>)}</View>
           </>}
+        </> : tab === 'training' ? <>
+          {loading ? <ActivityIndicator accessibilityLabel="Cargando equipo" /> : loadError ? <View style={styles.error}><Text>No se pudo cargar la plantilla.</Text><Pressable accessibilityRole="button" onPress={() => { setLoading(true); void load(); }}><Text style={styles.today}>Reintentar</Text></Pressable></View> : <TrainingPlansPanel teamId={team.id} initialPlayers={activePlayers.length} repository={repository.training} exercisesRepository={repository.exercises} onBusyChange={setSaving} />}
         </> : tab === 'exercises' ? <ExercisesLibrary repository={repository.exercises} onBusyChange={setSaving} /> : tab === 'matches' ? <>
           {loading ? <ActivityIndicator accessibilityLabel="Cargando equipo" /> : loadError ? <View style={styles.error}><Text>No se pudo cargar la plantilla.</Text><Pressable accessibilityRole="button" onPress={() => { setLoading(true); void load(); }}><Text style={styles.today}>Reintentar</Text></Pressable></View> : <MatchesPanel teamId={team.id} roster={roster} repository={repository.matches} />}
         </> : tab === 'summary' ? <>
@@ -140,7 +143,7 @@ export default function TeamScreen({ team, teams, repository, onLeave }: {
             {showArchived && <View style={styles.list}>{archivedPlayers.map(player => <View key={player.id} style={styles.playerRow}><Text style={styles.playerName}>{player.name} · #{player.number}</Text><Pressable accessibilityRole="button" accessibilityLabel={`Restaurar a ${player.name}`} disabled={saving} style={styles.action} onPress={() => archive(player, false)}><Text style={styles.today}>Restaurar jugador</Text></Pressable></View>)}</View>}
           </>}
         </>}
-        <View style={styles.next}><Text style={styles.nextTitle}>Lo siguiente, juntos</Text><Text style={styles.nextText}>Planificar entrenamientos diarios con los ejercicios de la biblioteca.</Text></View>
+        <View style={styles.next}><Text style={styles.nextTitle}>Del plan al campo</Text><Text style={styles.nextText}>Consulta el entrenamiento del día en «Entrenar» y registra la asistencia en «Pasar lista».</Text></View>
         <Text style={styles.footer}>{repository.demo ? 'Demo con datos ficticios. Los cambios se guardan solo en este dispositivo.' : 'Acceso privado del club. Los cambios se guardan en el servidor; hace falta conexión.'}</Text>
       </ScrollView>
       {editor && <PlayerEditor key={editor.player?.id ?? 'new'} player={editor.player} roster={roster} busy={saving} onSave={savePlayer} onClose={() => setEditor(null)} />}
