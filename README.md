@@ -125,6 +125,14 @@ Para activar la biblioteca con cuentas reales, ejecuta [la ampliación SQL de ej
 
 La demo incluye dos ejemplos ficticios y guarda sus cambios solo en el dispositivo. Las cuentas reales empiezan sin ejemplos. Se han comprobado validaciones, búsqueda, permisos, revisiones, reintentos y conservación de autoría en PostgreSQL local, y los flujos móviles con almacenamiento local y respuestas simuladas de Supabase. La activación y el guardado real requieren ejecutar el SQL y probar desde una cuenta del club.
 
+### Favoritos personales de ejercicios
+
+Cada entrenador puede marcar **☆ Guardar favorito** en cualquier ejercicio compartido, también en su ficha o al preparar una sesión. La estrella cambia a **★ En mis favoritos** al confirmar el guardado; al pulsarla de nuevo se quita de su selección. El filtro **Mis favoritos** funciona en la biblioteca y en el selector de **Entrenar**, combinado con búsqueda, contenido y categoría del equipo. Los archivados siguen ocultos salvo que se incluyan expresamente en la biblioteca; al restaurar un ejercicio conserva su estrella. Quitar un favorito no modifica las fichas ni los bloques de una sesión.
+
+Para cuentas reales, ejecuta [202611110002_exercise_favorites.sql](supabase/migrations/202611110002_exercise_favorites.sql) en Supabase después de activar la biblioteca. Los favoritos pertenecen a la cuenta, se comparten entre sus dispositivos y equipos y solo los puede leer o cambiar su propietario, incluidos los administradores. La tabla almacena referencias a usuario y ejercicio, sin copiar fichas, imágenes ni vídeos. En la demo se guardan por separado, solo en el dispositivo.
+
+La biblioteca permanece disponible si falta esta ampliación o falla la carga de favoritos. La interfaz muestra el estado pendiente y permite reintentar. Las altas y bajas son explícitas e idempotentes: si se pierde una respuesta, repetir no invierte la selección. Las pruebas verifican aislamiento de cuentas, permisos, reintentos y conservación de datos en PostgreSQL local; los flujos móviles se comprueban con cuentas y respuestas simuladas. La activación y sincronización real requieren aplicar el SQL y comprobarlo desde una cuenta del club.
+
 ## Planificación del entrenamiento diario
 
 **Entrenar → Crear entrenamiento** permite elegir una fecha, indicar jugadores previstos y notas, añadir ejercicios activos de la biblioteca, repetirlos como bloques distintos, ordenarlos, quitarlos y ajustar su duración. El cambio de duración pertenece al plan y conserva la ficha de la biblioteca. Admite de 1 a 50 bloques de 1 a 240 minutos, con un total máximo de 600 minutos. Los planes se pueden consultar por fechas, editar, archivar y restaurar. La lista inicial muestra hoy y fechas posteriores; **Todos** incluye el historial. Guardar muestra la fecha del plan recién guardado, aunque sea anterior a hoy.

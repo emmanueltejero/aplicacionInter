@@ -5,10 +5,13 @@ import type { Exercise, ExerciseInput, ExerciseViewer, ExerciseTeamCategory } fr
 import { exerciseImageBucket, exerciseImageBytes, exerciseMediaFields, validExerciseImagePath } from '../exerciseMedia';
 import type { PreparedExerciseImage } from '../exerciseMedia';
 import { demoImageKey } from './exerciseImages';
+import { demoExerciseFavoritesRepository, remoteExerciseFavoritesRepository } from './exerciseFavoritesRepository';
+import type { ExerciseFavoritesRepository } from './exerciseFavoritesRepository';
 
 export type ExerciseSave = ExerciseInput & { id: string; revision: number; archived: boolean; teamCategories?: ExerciseTeamCategory[]; imageUpload?: PreparedExerciseImage };
 export type ExerciseLibrary = { exercises: Exercise[]; viewer: ExerciseViewer; teamCategoriesReady?: boolean; mediaReady?: boolean };
 export interface ExercisesRepository {
+  readonly favorites: ExerciseFavoritesRepository;
   load(): Promise<ExerciseLibrary>;
   save(exercise: ExerciseSave): Promise<Exercise>;
 }
@@ -24,6 +27,7 @@ const examples: Exercise[] = [
     title: 'Finalización por parejas', description: 'Pase, control orientado y remate a portería por parejas. Alternar perfiles y rotar al pasador después de cada acción.', categories: ['Finalización', 'Técnica'], duration: 15, minPlayers: 6, maxPlayers: 12, spaceLength: 30, spaceWidth: 20, materials: [{ name: 'Balones', quantity: 6 }, { name: 'Conos', quantity: 4 }] },
 ];
 export const demoExercisesRepository: ExercisesRepository = {
+  favorites: demoExerciseFavoritesRepository,
   async load() {
     const value = await AsyncStorage.getItem(demoKey);
     return { exercises: parseExercises(value ?? JSON.stringify(examples)), viewer: demoViewer, teamCategoriesReady: true, mediaReady: true };
@@ -68,6 +72,7 @@ function fromRemote(row: RemoteExercise): Exercise {
 }
 export function remoteExercisesRepository(client: SupabaseClient): ExercisesRepository {
   return {
+    favorites: remoteExerciseFavoritesRepository(client),
     async load() {
       const { data, error } = await client.auth.getSession();
       if (error || !data.session) throw new Error('Vuelve a iniciar sesión para consultar la biblioteca.');
