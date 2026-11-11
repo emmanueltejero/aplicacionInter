@@ -200,6 +200,18 @@ Para activarlo ejecuta [202611110003_team_categories.sql](supabase/migrations/20
 
 Se han comprobado orden, combinación de filtros, permisos y conservación de datos con PostgreSQL local y flujos de móvil con respuestas simuladas. Tras activar el SQL, asigna la categoría a los equipos reales y recarga en los otros dispositivos para recoger el cambio.
 
+## Revisión de ejercicios por dirección metodológica
+
+Las fichas de la biblioteca pueden llevar **✓ Revisado y recomendado por el club**. La marca se muestra en el listado, en **Ver ficha** con la fecha de revisión y al elegir ejercicios para un entrenamiento. El filtro **Solo revisados por el club** se combina con búsqueda, contenido, categorías y favoritos; el orden por categoría del equipo se conserva. Las fichas sin marca siguen disponibles.
+
+Los administradores activos pueden revisar. También pueden autorizar entrenadores desde **Usuarios del club → Revisión metodológica → Autorizar como revisor**. Es un permiso independiente: no otorga administración ni permite editar fichas ajenas. Una cuenta desactivada no puede revisar aunque conserve ese permiso. Para marcar o retirar una revisión, el administrador o revisor abre **Ver ficha**, comprueba su contenido y usa el botón de revisión al final. Retirar el permiso impide revisiones futuras; las marcas que ya había puesto siguen perteneciendo al club.
+
+Para activarlo ejecuta [202611110004_exercise_reviews.sql](supabase/migrations/202611110004_exercise_reviews.sql) en Supabase, después de las ampliaciones de categorías de ejercicios e imágenes. No requiere volver a desplegar `club-users`. Los entrenadores existentes empiezan sin el permiso y ninguna ficha se aprueba automáticamente. Se guardan ejercicio, revisión, autor y fecha de la marca, sin duplicar imágenes ni contenido.
+
+La revisión solo se muestra para la versión vigente. Un cambio de descripción, duración, jugadores, espacio, material, categorías, imagen, vídeo o título retira la marca en el servidor, incluso si procede de una pestaña antigua. Archivar, restaurar o guardar el mismo contenido conserva la revisión, su autor y su fecha. Marcar o retirar una revisión no cambia el contenido ni su versión. Los reintentos idénticos conservan el resultado; revisar una ficha desactualizada o retirar una aprobación posterior se rechaza. Las sesiones, copias, PDF, favoritos y asignaciones existentes se conservan.
+
+Los permisos e invalidaciones se verifican con PostgreSQL local; los flujos móviles usan cuentas y respuestas simuladas. Si falta el SQL o falla la consulta, la biblioteca sigue disponible y la revisión no se presupone. Después de activarlo, autoriza a los responsables y comprueba una marca real desde una cuenta del club; en los otros dispositivos, actualiza la biblioteca para recogerla.
+
 ## Instalar la web en un dispositivo
 
 Abre [la web del club](https://emmanueltejero.github.io/aplicacionInter/) en un navegador externo a ChatGPT o WhatsApp. El botón **Instalar** abre el diálogo del navegador cuando está disponible y, en otros casos, muestra estas instrucciones:

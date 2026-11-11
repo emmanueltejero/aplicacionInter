@@ -14,6 +14,9 @@ import { trainingStyles as s } from './trainingStyles';
 import { ExerciseMedia } from './ExerciseMedia';
 import { ExerciseFavoriteButton, ExerciseFavoritesFilter } from './ExerciseFavorites';
 import { useExerciseFavorites } from './useExerciseFavorites';
+import { useExerciseReviews } from './useExerciseReviews';
+import { ExerciseReviewBadge, ExerciseReviewsFilter } from './ExerciseReviews';
+import { currentExerciseReview } from '../exerciseReviews';
 
 export function TrainingEditor({ plan, initialDate, initialPlayers, recommendedCategory, exercisesRepository, busy, onSave, onClose }: {
   plan?: TrainingPlan; initialDate?: string; initialPlayers: number; recommendedCategory?: ExerciseTeamCategory | null; exercisesRepository: ExercisesRepository; busy: boolean;
@@ -32,6 +35,8 @@ export function TrainingEditor({ plan, initialDate, initialPlayers, recommendedC
   const [category, setCategory] = useState<ExerciseCategory | ''>('');
   const [onlyFavorites, setOnlyFavorites] = useState(false);
   const favorites = useExerciseFavorites(exercisesRepository.favorites);
+  const reviews = useExerciseReviews(exercisesRepository.reviews);
+  const [onlyReviewed, setOnlyReviewed] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
   const scroll = useRef<ComponentRef<typeof ScrollView>>(null);
   const sequenceY = useRef(0);
@@ -60,7 +65,7 @@ export function TrainingEditor({ plan, initialDate, initialPlayers, recommendedC
   }
   const count = /^\d+$/.test(draft.playerCount) && Number(draft.playerCount) >= 1 && Number(draft.playerCount) <= 100 ? Number(draft.playerCount) : null;
   const totals = trainingTotals(draft.entries, count);
-  const selectedExercises = recommendedExercisesFirst(filterExercises(library ?? [], query, category, false, teamCategoriesReady ? teamCategory : '').filter(item => !onlyFavorites || (favorites.status === 'ready' && favorites.ids.has(item.id))), teamCategoriesReady ? recommendedCategory : null);
+  const selectedExercises = recommendedExercisesFirst(filterExercises(library ?? [], query, category, false, teamCategoriesReady ? teamCategory : '').filter(item => (!onlyFavorites || (favorites.status === 'ready' && favorites.ids.has(item.id))) && (!onlyReviewed || (reviews.status === 'ready' && currentExerciseReview(item, reviews.byId)))), teamCategoriesReady ? recommendedCategory : null);
   const occurrences = new Map<string, number>();
   for (const entry of draft.entries) occurrences.set(entry.exerciseId, (occurrences.get(entry.exerciseId) ?? 0) + 1);
   return <Modal visible transparent animationType="fade" onRequestClose={() => { if (!busy) onClose(); }}><View style={s.overlay}><View style={s.modal}><ScrollView ref={scroll} contentContainerStyle={s.modalContent} keyboardShouldPersistTaps="handled">
@@ -92,20 +97,22 @@ export function TrainingEditor({ plan, initialDate, initialPlayers, recommendedC
       <Text style={s.subtitle}>Biblioteca compartida</Text>
       {!library && !libraryError && <ActivityIndicator accessibilityLabel="Cargando ejercicios para el entrenamiento" />}
       {!!libraryError && <Text accessibilityRole="alert" style={s.error}>{libraryError} Puedes seguir editando los bloques ya guardados.</Text>}
-      <Pressable accessibilityRole="button" disabled={busy || (!library && !libraryError)} style={s.secondary} onPress={() => { setLibrary(null); setLibraryError(''); setAttempt(value => value + 1); favorites.refresh(); }}><Text style={s.blue}>Actualizar ejercicios</Text></Pressable>
+      <Pressable accessibilityRole="button" disabled={busy || (!library && !libraryError)} style={s.secondary} onPress={() => { setLibrary(null); setLibraryError(''); setAttempt(value => value + 1); favorites.refresh(); reviews.refresh(); }}><Text style={s.blue}>Actualizar ejercicios</Text></Pressable>
       {library && <>
         <TextInput accessibilityLabel="Buscar ejercicios para el entrenamiento" style={s.input} value={query} onChangeText={setQuery} placeholder="Buscar por nombre, descripción o material" placeholderTextColor="#718096" />
         <ExerciseFavoritesFilter favorites={favorites} onlyFavorites={onlyFavorites} onChange={setOnlyFavorites} disabled={busy} />
+        <ExerciseReviewsFilter reviews={reviews} onlyReviewed={onlyReviewed} onChange={setOnlyReviewed} disabled={busy} />
         {recommendedCategory && teamCategoriesReady ? <Text style={s.blue}>Primero los recomendados para {recommendedCategory}. Los demás ejercicios siguen disponibles.</Text> : recommendedCategory === null && <Text style={s.small}>Este equipo aún no tiene categoría. Un administrador puede asignarla desde «Usuarios del club → Categorías de equipos».</Text>}
         {!teamCategoriesReady && <ExerciseTeamCategoriesSetup />}
         <ExerciseTeamCategoryFilter value={teamCategory} onChange={setTeamCategory} disabled={!teamCategoriesReady || busy} />
         <Text style={s.label}>Contenido del ejercicio</Text>
         <View style={s.controls}><Pressable accessibilityRole="radio" accessibilityLabel="Todas las categorías para entrenamiento" accessibilityState={{ checked: !category }} style={[s.secondary, !category && s.selected]} onPress={() => setCategory('')}><Text style={s.blue}>Todas</Text></Pressable>{exerciseCategories.map(item => <Pressable key={item} accessibilityRole="radio" accessibilityLabel={`Categoría para entrenamiento ${item}`} accessibilityState={{ checked: category === item }} style={[s.secondary, category === item && s.selected]} onPress={() => setCategory(item)}><Text style={s.blue}>{item}</Text></Pressable>)}</View>
-        {!selectedExercises.length && (!onlyFavorites || favorites.status === 'ready') && <Text style={s.text}>{onlyFavorites && !favorites.ids.size ? 'Todavía no tienes favoritos. Pulsa «Todos» y guarda los ejercicios que uses más.' : library.some(item => !item.archivedAt) ? 'No hay ejercicios con estos filtros.' : 'Añade ejercicios en la pestaña Ejercicios para empezar a planificar.'}</Text>}
+        {!selectedExercises.length && (!onlyFavorites || favorites.status === 'ready') && (!onlyReviewed || reviews.status === 'ready') && <Text style={s.text}>{onlyFavorites && !favorites.ids.size ? 'Todavía no tienes favoritos. Pulsa «Todos» y guarda los ejercicios que uses más.' : library.some(item => !item.archivedAt) ? 'No hay ejercicios con estos filtros.' : 'Añade ejercicios en la pestaña Ejercicios para empezar a planificar.'}</Text>}
         {selectedExercises.map(exercise => {
           const added = occurrences.get(exercise.id) ?? 0;
           return <View key={exercise.id} accessibilityLabel={`Ficha para añadir: ${exercise.title}`} style={[s.card, added > 0 && s.selected]}>
             <Text style={s.subtitle}>{exercise.title}</Text><Text style={s.small}>{exercise.duration} min · {exercise.minPlayers}–{exercise.maxPlayers} jugadores · {exercise.spaceLength} × {exercise.spaceWidth} m</Text>
+            <ExerciseReviewBadge exercise={exercise} reviews={reviews} />
             {recommendedCategory && teamCategoriesReady && exercise.teamCategories?.includes(recommendedCategory) && <Text style={s.blue}>Recomendado para {recommendedCategory}</Text>}
             <ExerciseFavoriteButton exercise={exercise} favorites={favorites} disabled={busy} />
             <Text style={s.small}>Categorías de equipo: {exercise.teamCategories?.length ? exercise.teamCategories.join(' · ') : 'Sin clasificar'}</Text>

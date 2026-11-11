@@ -7,11 +7,14 @@ import type { PreparedExerciseImage } from '../exerciseMedia';
 import { demoImageKey } from './exerciseImages';
 import { demoExerciseFavoritesRepository, remoteExerciseFavoritesRepository } from './exerciseFavoritesRepository';
 import type { ExerciseFavoritesRepository } from './exerciseFavoritesRepository';
+import { demoExerciseReviewsRepository, remoteExerciseReviewsRepository } from './exerciseReviewsRepository';
+import type { ExerciseReviewsRepository } from './exerciseReviewsRepository';
 
 export type ExerciseSave = ExerciseInput & { id: string; revision: number; archived: boolean; teamCategories?: ExerciseTeamCategory[]; imageUpload?: PreparedExerciseImage };
 export type ExerciseLibrary = { exercises: Exercise[]; viewer: ExerciseViewer; teamCategoriesReady?: boolean; mediaReady?: boolean };
 export interface ExercisesRepository {
   readonly favorites: ExerciseFavoritesRepository;
+  readonly reviews: ExerciseReviewsRepository;
   load(): Promise<ExerciseLibrary>;
   save(exercise: ExerciseSave): Promise<Exercise>;
 }
@@ -28,6 +31,7 @@ const examples: Exercise[] = [
 ];
 export const demoExercisesRepository: ExercisesRepository = {
   favorites: demoExerciseFavoritesRepository,
+  reviews: demoExerciseReviewsRepository,
   async load() {
     const value = await AsyncStorage.getItem(demoKey);
     return { exercises: parseExercises(value ?? JSON.stringify(examples)), viewer: demoViewer, teamCategoriesReady: true, mediaReady: true };
@@ -73,10 +77,12 @@ function fromRemote(row: RemoteExercise): Exercise {
 export function remoteExercisesRepository(client: SupabaseClient): ExercisesRepository {
   return {
     favorites: remoteExerciseFavoritesRepository(client),
+    reviews: remoteExerciseReviewsRepository(client),
     async load() {
       const { data, error } = await client.auth.getSession();
       if (error || !data.session) throw new Error('Vuelve a iniciar sesión para consultar la biblioteca.');
-      const member = await client.from('club_members').select('user_id,role,enabled').eq('user_id', data.session.user.id).maybeSingle();
+      let member = await client.from('club_members').select('user_id,role,enabled,can_review_exercises').eq('user_id', data.session.user.id).maybeSingle();
+      if (member.error && ['42703', 'PGRST204'].includes(member.error.code)) member = await client.from('club_members').select('user_id,role,enabled').eq('user_id', data.session.user.id).maybeSingle();
       check(member.error);
       if (!member.data?.enabled) throw new Error('Tu cuenta no tiene acceso activo a la biblioteca del club.');
       const exercises: Exercise[] = [];
@@ -95,7 +101,7 @@ export function remoteExercisesRepository(client: SupabaseClient): ExercisesRepo
         check(result.error);
         const rows = result.data ?? [];
         exercises.push(...rows.map(fromRemote));
-        if (rows.length < 500) return { exercises, viewer: { id: data.session.user.id, admin: member.data.role === 'admin' }, teamCategoriesReady, mediaReady };
+        if (rows.length < 500) return { exercises, viewer: { id: data.session.user.id, admin: member.data.role === 'admin', canReview: member.data.role === 'admin' || member.data.can_review_exercises === true }, teamCategoriesReady, mediaReady };
       }
     },
     async save(exercise) {

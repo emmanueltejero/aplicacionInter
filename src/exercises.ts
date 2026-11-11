@@ -13,7 +13,7 @@ export type ExerciseInput = {
 export type Exercise = ExerciseInput & {
   id: string; createdBy: string | null; revision: number; archivedAt: string | null; teamCategories?: ExerciseTeamCategory[];
 };
-export type ExerciseViewer = { id: string; admin: boolean };
+export type ExerciseViewer = { id: string; admin: boolean; canReview?: boolean };
 export type ExerciseDraft = Omit<ExerciseInput, 'duration' | 'minPlayers' | 'maxPlayers' | 'spaceLength' | 'spaceWidth' | 'materials'> & {
   duration: string; minPlayers: string; maxPlayers: string; spaceLength: string; spaceWidth: string;
   materials: { name: string; quantity: string }[];

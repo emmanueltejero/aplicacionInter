@@ -10,6 +10,9 @@ import { ExerciseMedia } from './ExerciseMedia';
 import { ExerciseMediaSetup } from './ExerciseMediaSetup';
 import { ExerciseFavoriteButton, ExerciseFavoritesFilter } from './ExerciseFavorites';
 import { useExerciseFavorites } from './useExerciseFavorites';
+import { useExerciseReviews } from './useExerciseReviews';
+import { ExerciseReviewBadge, ExerciseReviewsFilter, ExerciseReviewsSetup } from './ExerciseReviews';
+import { currentExerciseReview } from '../exerciseReviews';
 
 const setupUrl = 'https://github.com/emmanueltejero/aplicacionInter/blob/main/supabase/migrations/202611100001_exercises.sql';
 export function ExercisesLibrary({ repository, onBusyChange }: { repository: ExercisesRepository; onBusyChange?: (busy: boolean) => void }) {
@@ -23,6 +26,8 @@ export function ExercisesLibrary({ repository, onBusyChange }: { repository: Exe
   const [includeArchived, setIncludeArchived] = useState(false);
   const [onlyFavorites, setOnlyFavorites] = useState(false);
   const favorites = useExerciseFavorites(repository.favorites);
+  const reviews = useExerciseReviews(repository.reviews);
+  const [onlyReviewed, setOnlyReviewed] = useState(false);
   const [busy, setBusy] = useState(false);
   const locked = useRef(false);
   const [editor, setEditor] = useState<{ exercise?: Exercise } | null>(null);
@@ -33,7 +38,7 @@ export function ExercisesLibrary({ repository, onBusyChange }: { repository: Exe
       .catch(cause => { if (active) setLoadError(cause instanceof Error ? cause : new Error('No se pudo cargar la biblioteca.')); });
     return () => { active = false; };
   }, [repository, attempt]);
-  const exercises = useMemo(() => filterExercises(library?.exercises ?? [], query, category, includeArchived, library?.teamCategoriesReady === false ? '' : teamCategory).filter(item => !onlyFavorites || (favorites.status === 'ready' && favorites.ids.has(item.id))), [library, query, category, includeArchived, teamCategory, onlyFavorites, favorites.ids, favorites.status]);
+  const exercises = useMemo(() => filterExercises(library?.exercises ?? [], query, category, includeArchived, library?.teamCategoriesReady === false ? '' : teamCategory).filter(item => (!onlyFavorites || (favorites.status === 'ready' && favorites.ids.has(item.id))) && (!onlyReviewed || (reviews.status === 'ready' && currentExerciseReview(item, reviews.byId)))), [library, query, category, includeArchived, teamCategory, onlyFavorites, favorites.ids, favorites.status, onlyReviewed, reviews.status, reviews.byId]);
   async function save(request: ExerciseSave) {
     if (locked.current) throw new Error('Espera a que termine el guardado.');
     locked.current = true; setBusy(true); onBusyChange?.(true); setError('');
@@ -41,10 +46,17 @@ export function ExercisesLibrary({ repository, onBusyChange }: { repository: Exe
       const saved = await repository.save(request);
       setLibrary(current => current ? { ...current, exercises: current.exercises.some(item => item.id === saved.id) ? current.exercises.map(item => item.id === saved.id ? saved : item) : [...current.exercises, saved] } : current);
       setEditor(null); setDetail(null);
+      reviews.refresh();
     } catch (cause) { const message = cause instanceof Error ? cause.message : 'No se pudo guardar el ejercicio.'; setError(message); throw new Error(message); }
     finally { locked.current = false; setBusy(false); onBusyChange?.(false); }
   }
-  function refresh() { setLibrary(null); setLoadError(null); setError(''); setAttempt(value => value + 1); favorites.refresh(); }
+  async function review(exercise: Exercise, reviewed: boolean) {
+    if (locked.current) return;
+    locked.current = true; setBusy(true); onBusyChange?.(true);
+    try { await reviews.setReview(exercise, reviewed); }
+    finally { locked.current = false; setBusy(false); onBusyChange?.(false); }
+  }
+  function refresh() { setLibrary(null); setLoadError(null); setError(''); setAttempt(value => value + 1); favorites.refresh(); reviews.refresh(); }
   if (loadError) return <View style={s.container}>
     <Text style={s.title}>Biblioteca de ejercicios</Text><Text accessibilityRole="alert" style={s.error}>{loadError.message}</Text>
     {loadError instanceof ExercisesSetupRequired && <><Text style={s.text}>Para activar la biblioteca compartida, el administrador debe ejecutar una vez su SQL de activación en Supabase. Las otras pestañas siguen disponibles.</Text><Pressable accessibilityRole="link" style={s.secondary} onPress={() => { void Linking.openURL(setupUrl).catch(() => setError('No se pudo abrir GitHub. Busca supabase/migrations/202611100001_exercises.sql en el repositorio.')); }}><Text style={s.blue}>Abrir SQL de la biblioteca en GitHub</Text></Pressable></>}
@@ -58,6 +70,7 @@ export function ExercisesLibrary({ repository, onBusyChange }: { repository: Exe
     <Pressable accessibilityRole="button" style={s.primary} disabled={busy} onPress={() => { setError(''); setEditor({}); }}><Text style={s.white}>Añadir ejercicio</Text></Pressable>
     <TextInput accessibilityLabel="Buscar ejercicios" placeholder="Buscar por nombre, descripción o material" placeholderTextColor="#718096" style={s.input} value={query} onChangeText={setQuery} />
     <ExerciseFavoritesFilter favorites={favorites} onlyFavorites={onlyFavorites} onChange={setOnlyFavorites} disabled={busy} />
+    <ExerciseReviewsFilter reviews={reviews} onlyReviewed={onlyReviewed} onChange={setOnlyReviewed} disabled={busy} />
     {library.teamCategoriesReady === false && <ExerciseTeamCategoriesSetup />}
     {library.mediaReady === false && <ExerciseMediaSetup />}
     <ExerciseTeamCategoryFilter value={teamCategory} onChange={setTeamCategory} disabled={library.teamCategoriesReady === false} />
@@ -66,9 +79,10 @@ export function ExercisesLibrary({ repository, onBusyChange }: { repository: Exe
     <Pressable accessibilityRole="checkbox" accessibilityLabel="Incluir ejercicios archivados" accessibilityState={{ checked: includeArchived }} style={s.checkbox} onPress={() => setIncludeArchived(value => !value)}><Text style={s.blue}>{includeArchived ? '☑' : '☐'} Incluir archivados</Text></Pressable>
     <View style={s.controls}><Text accessibilityLiveRegion="polite" style={s.text}>{exercises.length} {exercises.length === 1 ? 'ejercicio' : 'ejercicios'}</Text><Pressable accessibilityRole="button" disabled={busy} style={s.secondary} onPress={refresh}><Text style={s.blue}>Actualizar biblioteca</Text></Pressable></View>
     {!!error && <Text accessibilityRole="alert" style={s.error}>{error}</Text>}
-    {exercises.length === 0 && (!onlyFavorites || favorites.status === 'ready') && <Text style={s.text}>{onlyFavorites && !favorites.ids.size ? 'Todavía no tienes favoritos. Pulsa «Todos» y guarda los ejercicios que uses más.' : library.exercises.length ? 'No hay ejercicios con estos filtros. Prueba otra búsqueda o categoría.' : 'La biblioteca está vacía. Añade el primer ejercicio para compartirlo con el club.'}</Text>}
+    {exercises.length === 0 && (!onlyFavorites || favorites.status === 'ready') && (!onlyReviewed || reviews.status === 'ready') && <Text style={s.text}>{onlyFavorites && !favorites.ids.size ? 'Todavía no tienes favoritos. Pulsa «Todos» y guarda los ejercicios que uses más.' : library.exercises.length ? 'No hay ejercicios con estos filtros. Prueba otra búsqueda o categoría.' : 'La biblioteca está vacía. Añade el primer ejercicio para compartirlo con el club.'}</Text>}
     {exercises.map(exercise => <View key={exercise.id} style={s.card} accessibilityLabel={`Ejercicio ${exercise.title}`}>
       <Text style={s.name}>{exercise.title}</Text>
+      <ExerciseReviewBadge exercise={exercise} reviews={reviews} />
       <Text style={s.author}>{exercise.createdBy === library.viewer.id ? 'Añadido por ti' : 'Compartido por otro entrenador'}{exercise.archivedAt ? ' · Archivado' : ''}</Text>
       <ExerciseFavoriteButton exercise={exercise} favorites={favorites} disabled={busy} />
       <View style={s.controls}>{exercise.categories.map(item => <Text key={item} style={s.tag}>{item}</Text>)}</View>
@@ -86,8 +100,8 @@ export function ExercisesLibrary({ repository, onBusyChange }: { repository: Exe
       </View>
     </View>)}
     <Text style={s.text}>Archivar oculta un ejercicio sin perder su ficha. Puedes encontrarlo de nuevo activando «Incluir archivados».</Text>
-    {editor && <ExerciseEditor key={editor.exercise?.id ?? 'new'} exercise={editor.exercise} busy={busy} onSave={async request => { await save(request); setQuery(''); setCategory(''); setTeamCategory(''); setOnlyFavorites(false); if (request.archived) setIncludeArchived(true); }} onClose={() => setEditor(null)} />}
-    {detail && <Modal visible transparent animationType="fade" onRequestClose={() => setDetail(null)}><View style={s.overlay}><View style={s.detail}><ScrollView contentContainerStyle={s.detailContent}>
+    {editor && <ExerciseEditor key={editor.exercise?.id ?? 'new'} exercise={editor.exercise} busy={busy} onSave={async request => { await save(request); setQuery(''); setCategory(''); setTeamCategory(''); setOnlyFavorites(false); setOnlyReviewed(false); if (request.archived) setIncludeArchived(true); }} onClose={() => setEditor(null)} />}
+    {detail && <Modal visible transparent animationType="fade" onRequestClose={() => { if (!busy) setDetail(null); }}><View style={s.overlay}><View style={s.detail}><ScrollView contentContainerStyle={s.detailContent}>
       <Text style={s.title}>{detail.title}</Text><Text style={s.text}>{detail.categories.join(' · ')}{detail.archivedAt ? ' · Archivado' : ''}</Text>
       <ExerciseFavoriteButton exercise={detail} favorites={favorites} disabled={busy} />
       <ExerciseMedia imagePath={detail.imagePath} videoUrl={detail.videoUrl} />
@@ -95,7 +109,19 @@ export function ExercisesLibrary({ repository, onBusyChange }: { repository: Exe
       <Text style={s.text}>{detail.duration} minutos · {detail.minPlayers}–{detail.maxPlayers} jugadores</Text><Text style={s.text}>Espacio: {detail.spaceLength} × {detail.spaceWidth} m ({detail.spaceLength * detail.spaceWidth} m²)</Text>
       <Text style={s.label}>Descripción y desarrollo</Text><Text style={s.description}>{detail.description}</Text><Text style={s.label}>Material</Text>
       {detail.materials.length ? detail.materials.map(item => <Text key={item.name} style={s.text}>{item.quantity} × {item.name}</Text>) : <Text style={s.text}>Sin material</Text>}
-      <Pressable accessibilityRole="button" style={s.primary} onPress={() => setDetail(null)}><Text style={s.white}>Cerrar ficha</Text></Pressable>
+      <Text style={s.label}>Revisión metodológica</Text>
+      {reviews.status === 'loading' && <Text accessibilityLiveRegion="polite" style={s.text}>Consultando la revisión del club…</Text>}
+      {reviews.status === 'error' && <Text accessibilityRole="alert" style={s.error}>{reviews.loadError}</Text>}
+      <ExerciseReviewBadge exercise={detail} reviews={reviews} showDate />
+      {reviews.status === 'ready' && !currentExerciseReview(detail, reviews.byId) && <Text style={s.text}>Pendiente de revisión del club.</Text>}
+      {reviews.status === 'ready' && (library.viewer.admin || library.viewer.canReview) && <>
+        <Text style={s.text}>Comprueba la ficha completa antes de recomendarla. Si cambia su contenido, necesitará una nueva revisión.</Text>
+        <Pressable accessibilityRole="button" disabled={busy} style={s.secondary} onPress={() => { void review(detail, !currentExerciseReview(detail, reviews.byId)); }}><Text style={s.blue}>{busy ? 'Guardando revisión…' : currentExerciseReview(detail, reviews.byId) ? 'Quitar revisión del club' : 'Marcar como revisado por el club'}</Text></Pressable>
+      </>}
+      {reviews.failure?.exerciseId === detail.id && <Text accessibilityRole="alert" style={s.error}>{reviews.failure.message}</Text>}
+      {reviews.status === 'setup' && <ExerciseReviewsSetup />}
+      {(reviews.status === 'setup' || reviews.status === 'error') && <Pressable accessibilityRole="button" disabled={busy} style={s.secondary} onPress={reviews.refresh}><Text style={s.blue}>Actualizar revisión de la ficha</Text></Pressable>}
+      <Pressable accessibilityRole="button" disabled={busy} style={s.primary} onPress={() => setDetail(null)}><Text style={s.white}>Cerrar ficha</Text></Pressable>
     </ScrollView></View></View></Modal>}
   </View>;
 }

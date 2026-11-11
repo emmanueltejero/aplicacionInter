@@ -12,6 +12,8 @@ import { TeamCategoriesSetupRequired } from '../teams';
 import type { Team } from '../teams';
 import { TeamCategoryPicker, TeamCategoriesSetup } from './TeamCategoryPicker';
 import { TeamCategoryEditor } from './TeamCategoryEditor';
+import { ExerciseReviewerEditor } from './ExerciseReviewerEditor';
+import { ExerciseReviewsSetup } from './ExerciseReviews';
 
 const guideUrl = 'https://github.com/emmanueltejero/aplicacionInter/blob/main/supabase/WEB-USERS.md';
 type Directory = Awaited<ReturnType<UsersRepository['load']>>;
@@ -33,6 +35,7 @@ export function UsersPanel({ repository, onBusyChange, onTeamsChanged }: {
   const [showTeamCategories, setShowTeamCategories] = useState(false);
   const [categoryEditor, setCategoryEditor] = useState<Team | null>(null);
   const [accessEditor, setAccessEditor] = useState<ClubUser | null>(null);
+  const [reviewerEditor, setReviewerEditor] = useState<ClubUser | null>(null);
   useEffect(() => {
     let active = true;
     repository.load().then(result => { if (active) { setData(result); setLoadError(null); } })
@@ -73,6 +76,15 @@ export function UsersPanel({ repository, onBusyChange, onTeamsChanged }: {
       onTeamsChanged(team); setCategoryEditor(null); setNotice(`Categoría de ${team.name}: ${team.category ?? 'Sin categoría'}.`);
     } finally { locked.current = false; setBusy(false); onBusyChange(false); }
   }
+  async function saveReviewer(allowed: boolean) {
+    if (locked.current || !reviewerEditor) throw new Error('Espera a que termine la operación.');
+    locked.current = true; setBusy(true); onBusyChange(true); setNotice('');
+    try {
+      await repository.setExerciseReviewer(reviewerEditor, allowed);
+      setData(current => current ? { ...current, users: current.users.map(user => user.id === reviewerEditor.id ? { ...user, canReviewExercises: allowed } : user) } : current);
+      setReviewerEditor(null); setNotice(allowed ? 'Permiso de revisión metodológica concedido.' : 'Permiso de revisión metodológica retirado.');
+    } finally { locked.current = false; setBusy(false); onBusyChange(false); }
+  }
   async function saveAccess(request: CoachAccessUpdate) {
     if (locked.current) throw new Error('Espera a que termine la operación.');
     locked.current = true; setBusy(true); onBusyChange(true); setError(''); setNotice('');
@@ -99,6 +111,7 @@ export function UsersPanel({ repository, onBusyChange, onTeamsChanged }: {
     {!data.teams.length && <Text style={s.text}>Crea el primer equipo para poder asignarlo al entrenador.</Text>}
     <View style={s.controls}><Pressable accessibilityRole="button" style={s.secondary} disabled={busy} onPress={() => { setTeamError(''); setTeamSetupNeeded(false); setTeamEditor({ id: newRecordId(), name: '', category: null }); }}><Text style={s.blue}>Crear equipo</Text></Pressable><Pressable accessibilityRole="button" style={s.secondary} disabled={busy} onPress={refresh}><Text style={s.blue}>Actualizar usuarios</Text></Pressable></View>
     {!!notice && <Text accessibilityLiveRegion="polite" style={s.blue}>{notice}</Text>}{!!error && <Text accessibilityRole="alert" style={s.error}>{error}</Text>}
+    {!data.exerciseReviewersReady && <ExerciseReviewsSetup />}
     <Pressable accessibilityRole="button" accessibilityLabel="Categorías de equipos" aria-expanded={showTeamCategories} disabled={busy} style={s.secondary} onPress={() => setShowTeamCategories(value => !value)}><Text style={s.blue}>Categorías de equipos {showTeamCategories ? '▴' : '▾'}</Text></Pressable>
     {showTeamCategories && <View style={s.container}>
       <Text style={s.text}>Asigna una categoría a cada equipo para priorizar sus ejercicios al preparar entrenamientos.</Text>
@@ -115,13 +128,16 @@ export function UsersPanel({ repository, onBusyChange, onTeamsChanged }: {
     {users.map(user => <View key={user.id} style={s.card} accessibilityLabel={`Usuario ${user.email}`}>
       <Text style={s.subtitle}>{user.name || user.email}</Text><Text style={s.text}>{user.email}</Text>
       <Text style={s.blue}>{user.role === 'admin' ? 'Administrador' : 'Entrenador'} · {user.enabled ? 'Activo' : 'Desactivado'}</Text>
+      {user.role === 'coach' && user.canReviewExercises && <Text style={s.blue}>Revisor de ejercicios{!user.enabled ? ' · Cuenta desactivada' : ''}</Text>}
       <Text style={s.text}>{user.role === 'admin' ? 'Acceso a todos los equipos del club' : user.teamIds.map(id => data.teams.find(team => team.id === id)?.name ?? 'Equipo no disponible').join(' · ') || 'Sin equipos asignados'}</Text>
       {user.role === 'coach' && <Pressable accessibilityRole="button" accessibilityLabel={`Gestionar acceso de ${user.email}`} disabled={busy} style={s.secondary} onPress={() => { setError(''); setNotice(''); setAccessEditor(user); }}><Text style={s.blue}>Equipos y acceso</Text></Pressable>}
+      {user.role === 'coach' && <Pressable accessibilityRole="button" accessibilityLabel={`Gestionar revisión metodológica de ${user.email}`} disabled={busy || !data.exerciseReviewersReady} style={s.secondary} onPress={() => setReviewerEditor(user)}><Text style={s.blue}>Revisión metodológica</Text></Pressable>}
     </View>)}
     <Pressable accessibilityRole="button" style={s.secondary} disabled={busy} onPress={openGuide}><Text style={s.blue}>Guía de activación de Usuarios</Text></Pressable>
     {form && <CoachAccountForm teams={data.teams} busy={busy} onCreate={create} onClose={() => setForm(false)} onSetup={openGuide} />}
     {accessEditor && <CoachAccessEditor key={accessEditor.id} user={accessEditor} teams={data.teams} busy={busy} onSave={saveAccess} onClose={() => setAccessEditor(null)} />}
     {categoryEditor && <TeamCategoryEditor key={categoryEditor.id} team={categoryEditor} busy={busy} onSave={saveTeamCategory} onClose={() => setCategoryEditor(null)} />}
+    {reviewerEditor && <ExerciseReviewerEditor key={reviewerEditor.id} user={reviewerEditor} busy={busy} onSave={saveReviewer} onClose={() => setReviewerEditor(null)} />}
     {teamEditor && <Modal visible transparent animationType="fade" onRequestClose={() => { if (!busy) setTeamEditor(null); }}><View style={s.overlay}><View style={s.modal}><ScrollView contentContainerStyle={s.modalContent} keyboardShouldPersistTaps="handled">
       <Text style={s.title}>Crear equipo</Text><Text style={s.label}>Nombre del equipo</Text><TextInput accessibilityLabel="Nombre del nuevo equipo" style={s.input} value={teamEditor.name} onChangeText={name => setTeamEditor({ ...teamEditor, name })} editable={!busy} maxLength={80} />
       {data.teamCategoriesReady && <TeamCategoryPicker value={teamEditor.category ?? null} onChange={category => setTeamEditor({ ...teamEditor, category })} disabled={busy} />}

@@ -1,4 +1,4 @@
-export type ClubUser = { id: string; email: string; name: string; role: 'admin' | 'coach'; enabled: boolean; teamIds: string[] };
+export type ClubUser = { id: string; email: string; name: string; role: 'admin' | 'coach'; enabled: boolean; teamIds: string[]; canReviewExercises?: boolean };
 export type CoachAccountDraft = { id: string; email: string; name: string; password: string; teamIds: string[] };
 export type CoachAccountResult = { id: string; email: string; replayed: boolean };
 export type CoachAccessUpdate = { id: string; enabled: boolean; teamIds: string[]; expectedEnabled: boolean; expectedTeamIds: string[] };

@@ -158,3 +158,15 @@ Desde una cuenta administradora, abre **Menú → Usuarios del club → Categor�
 La tabla `teams` incorpora `category`, nullable y con valores validados. `admin_create_team_with_category` crea nombre y categoría de forma atómica; `admin_set_team_category` compara el valor esperado antes de cambiarlo. Ambas exigen administrador activo, usan la sesión del cliente y admiten reintentos seguros. RLS sigue limitando las lecturas a los equipos asignados y no se conceden escrituras directas. La API de creación anterior sigue funcionando y conserva la categoría al confirmar equipos ya creados.
 
 Verifica el cambio abriendo un entrenamiento del equipo: sus ejercicios recomendados deben aparecer primero y los demás seguir disponibles. Cambia de equipo y comprueba que usa su propia categoría. Los favoritos, plantillas, asistencia, partidos y sesiones guardadas deben conservarse. En otros dispositivos, recarga para recoger la categoría actualizada.
+
+## Activar la revisión metodológica de ejercicios
+
+Ejecuta [202611110004_exercise_reviews.sql](migrations/202611110004_exercise_reviews.sql) completo en **SQL Editor → New query → Run** tras activar categorías de ejercicios e imágenes. Es repetible y conserva los datos actuales. No requiere desplegar de nuevo la función Edge. Después recarga la web.
+
+El administrador puede abrir **Usuarios del club**, localizar a un entrenador y usar **Revisión metodológica → Autorizar como revisor**. Todos los entrenadores empiezan sin ese permiso. Los administradores activos pueden revisar sin una asignación adicional. El nuevo permiso no modifica rol, equipos, acceso ni autoría de las fichas; solo un administrador puede concederlo o retirarlo. Desactivar la cuenta bloquea también la revisión.
+
+`exercise_reviews` tiene una fila por ficha aprobada, con su versión, revisor y fecha. RLS permite leer las marcas a los miembros activos del club. Las escrituras directas están denegadas. `set_exercise_review` verifica permiso y versión, obtiene el autor de la sesión y confirma altas y bajas explícitas. La repetición de una aprobación conserva fecha y autor; retirar una marca con una fecha esperada antigua se rechaza si ya existe una nueva aprobación. `admin_set_exercise_reviewer` gestiona únicamente el permiso delegado de las cuentas de entrenador.
+
+Un trigger de `exercises` invalida la marca ante cambios de contenido, incluidos medios y categorías, desde cualquier API de edición. Archivar, restaurar y guardar idéntico contenido actualizan la versión asociada sin cambiar la fecha original. Las migraciones no aprueban ejercicios ni reescriben entrenamientos históricos. Retirar el permiso a un revisor conserva las aprobaciones anteriores; las puede retirar un administrador u otro revisor autorizado.
+
+Comprueba con un entrenador autorizado que puede marcar una ficha de otro autor, pero sigue sin poder editarla ni gestionar usuarios. Desde otro entrenador, actualiza la biblioteca para ver la marca y usar **Solo revisados por el club**. Edita el contenido desde su autor y verifica que la marca desaparece. Comprueba también la retirada de una marca y la revocación del permiso de revisión.
