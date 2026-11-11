@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import type { ComponentRef } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { dateKey, formatDateInput } from '../domain';
-import { exerciseCategories, filterExercises } from '../exercises';
-import type { Exercise, ExerciseCategory, ExerciseTeamCategoryFilter as TeamFilter } from '../exercises';
+import { exerciseCategories, filterExercises, recommendedExercisesFirst } from '../exercises';
+import type { Exercise, ExerciseCategory, ExerciseTeamCategory, ExerciseTeamCategoryFilter as TeamFilter } from '../exercises';
 import type { ExercisesRepository } from '../data/exercisesRepository';
 import { entryFromExercise, trainingDraft, trainingTotals, validateTraining } from '../trainingPlans';
 import type { TrainingDraft, TrainingPlan, TrainingSave } from '../trainingPlans';
@@ -15,8 +15,8 @@ import { ExerciseMedia } from './ExerciseMedia';
 import { ExerciseFavoriteButton, ExerciseFavoritesFilter } from './ExerciseFavorites';
 import { useExerciseFavorites } from './useExerciseFavorites';
 
-export function TrainingEditor({ plan, initialDate, initialPlayers, exercisesRepository, busy, onSave, onClose }: {
-  plan?: TrainingPlan; initialDate?: string; initialPlayers: number; exercisesRepository: ExercisesRepository; busy: boolean;
+export function TrainingEditor({ plan, initialDate, initialPlayers, recommendedCategory, exercisesRepository, busy, onSave, onClose }: {
+  plan?: TrainingPlan; initialDate?: string; initialPlayers: number; recommendedCategory?: ExerciseTeamCategory | null; exercisesRepository: ExercisesRepository; busy: boolean;
   onSave: (plan: TrainingSave) => Promise<void>; onClose: () => void;
 }) {
   const [id] = useState(() => plan?.id ?? newRecordId());
@@ -60,7 +60,7 @@ export function TrainingEditor({ plan, initialDate, initialPlayers, exercisesRep
   }
   const count = /^\d+$/.test(draft.playerCount) && Number(draft.playerCount) >= 1 && Number(draft.playerCount) <= 100 ? Number(draft.playerCount) : null;
   const totals = trainingTotals(draft.entries, count);
-  const selectedExercises = filterExercises(library ?? [], query, category, false, teamCategoriesReady ? teamCategory : '').filter(item => !onlyFavorites || (favorites.status === 'ready' && favorites.ids.has(item.id)));
+  const selectedExercises = recommendedExercisesFirst(filterExercises(library ?? [], query, category, false, teamCategoriesReady ? teamCategory : '').filter(item => !onlyFavorites || (favorites.status === 'ready' && favorites.ids.has(item.id))), teamCategoriesReady ? recommendedCategory : null);
   const occurrences = new Map<string, number>();
   for (const entry of draft.entries) occurrences.set(entry.exerciseId, (occurrences.get(entry.exerciseId) ?? 0) + 1);
   return <Modal visible transparent animationType="fade" onRequestClose={() => { if (!busy) onClose(); }}><View style={s.overlay}><View style={s.modal}><ScrollView ref={scroll} contentContainerStyle={s.modalContent} keyboardShouldPersistTaps="handled">
@@ -96,6 +96,7 @@ export function TrainingEditor({ plan, initialDate, initialPlayers, exercisesRep
       {library && <>
         <TextInput accessibilityLabel="Buscar ejercicios para el entrenamiento" style={s.input} value={query} onChangeText={setQuery} placeholder="Buscar por nombre, descripción o material" placeholderTextColor="#718096" />
         <ExerciseFavoritesFilter favorites={favorites} onlyFavorites={onlyFavorites} onChange={setOnlyFavorites} disabled={busy} />
+        {recommendedCategory && teamCategoriesReady ? <Text style={s.blue}>Primero los recomendados para {recommendedCategory}. Los demás ejercicios siguen disponibles.</Text> : recommendedCategory === null && <Text style={s.small}>Este equipo aún no tiene categoría. Un administrador puede asignarla desde «Usuarios del club → Categorías de equipos».</Text>}
         {!teamCategoriesReady && <ExerciseTeamCategoriesSetup />}
         <ExerciseTeamCategoryFilter value={teamCategory} onChange={setTeamCategory} disabled={!teamCategoriesReady || busy} />
         <Text style={s.label}>Contenido del ejercicio</Text>
@@ -105,6 +106,7 @@ export function TrainingEditor({ plan, initialDate, initialPlayers, exercisesRep
           const added = occurrences.get(exercise.id) ?? 0;
           return <View key={exercise.id} accessibilityLabel={`Ficha para añadir: ${exercise.title}`} style={[s.card, added > 0 && s.selected]}>
             <Text style={s.subtitle}>{exercise.title}</Text><Text style={s.small}>{exercise.duration} min · {exercise.minPlayers}–{exercise.maxPlayers} jugadores · {exercise.spaceLength} × {exercise.spaceWidth} m</Text>
+            {recommendedCategory && teamCategoriesReady && exercise.teamCategories?.includes(recommendedCategory) && <Text style={s.blue}>Recomendado para {recommendedCategory}</Text>}
             <ExerciseFavoriteButton exercise={exercise} favorites={favorites} disabled={busy} />
             <Text style={s.small}>Categorías de equipo: {exercise.teamCategories?.length ? exercise.teamCategories.join(' · ') : 'Sin clasificar'}</Text>
             <Text accessibilityLiveRegion="polite" style={added ? s.blue : s.small}>{added ? `✓ Añadido a esta sesión: ${added} ${added === 1 ? 'vez' : 'veces'}` : 'Todavía no está en esta sesión'}</Text>

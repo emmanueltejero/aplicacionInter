@@ -71,6 +71,10 @@ export function filterExercises(exercises: Exercise[], query: string, category: 
     return terms.every(term => text.includes(term));
   }).sort((a, b) => a.title.localeCompare(b.title, 'es') || a.id.localeCompare(b.id));
 }
+export function recommendedExercisesFirst(exercises: Exercise[], category?: ExerciseTeamCategory | null): Exercise[] {
+  if (!category) return exercises;
+  return [...exercises].sort((a, b) => Number(b.teamCategories?.includes(category) ?? false) - Number(a.teamCategories?.includes(category) ?? false));
+}
 export function parseExercises(value: string | null): Exercise[] {
   if (value === null) return [];
   const parsed: unknown = JSON.parse(value);

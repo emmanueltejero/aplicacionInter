@@ -10,8 +10,10 @@ import { demoTrainingRepository, remoteTrainingRepository } from './trainingRepo
 import type { TrainingRepository } from './trainingRepository';
 import { demoUsersRepository, remoteUsersRepository } from './usersRepository';
 import type { UsersRepository } from './usersRepository';
+import { loadTeams } from './teamsRepository';
+import type { Team } from '../teams';
 
-export type Team = { id: string; name: string };
+export type { Team } from '../teams';
 export type TeamData = { roster: Player[]; register: Register };
 export interface ClubRepository {
   readonly demo: boolean;
@@ -39,7 +41,7 @@ export const demoRepository: ClubRepository = {
   exercises: demoExercisesRepository,
   training: demoTrainingRepository,
   users: demoUsersRepository,
-  async teams() { return [{ id: DEMO_TEAM, name: 'Equipo de prueba' }]; },
+  async teams() { return [{ id: DEMO_TEAM, name: 'Equipo de prueba', category: 'Alevín' }]; },
   async load(teamId) {
     requireDemoTeam(teamId);
     const [roster, register] = await Promise.all([AsyncStorage.getItem(ROSTER_KEY), AsyncStorage.getItem(ATTENDANCE_KEY)]);
@@ -105,8 +107,7 @@ export function remoteRepository(client: SupabaseClient): ClubRepository {
     training: remoteTrainingRepository(client),
     users: remoteUsersRepository(client),
     async teams() {
-      const { data, error } = await client.from('teams').select('id,name').order('name');
-      check(error); return data ?? [];
+      return (await loadTeams(client)).teams;
     },
     async load(teamId) {
       const [roster, attendance] = await Promise.all([

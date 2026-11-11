@@ -1,12 +1,17 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { UsersRequestFailure, UsersSetupRequired, userCreationFailure, validateCoachAccount, validateCoachAccess } from '../clubUsers';
 import type { ClubUser, CoachAccountDraft, CoachAccountResult, CoachAccessResult, CoachAccessUpdate } from '../clubUsers';
+import { TeamCategoriesSetupRequired, validateTeamCategory } from '../teams';
+import type { Team } from '../teams';
+import type { ExerciseTeamCategory } from '../exercises';
+import { loadTeams } from './teamsRepository';
 
 export interface UsersRepository {
   isAdmin(): Promise<boolean>;
-  load(): Promise<{ users: ClubUser[]; teams: { id: string; name: string }[] }>;
+  load(): Promise<{ users: ClubUser[]; teams: Team[]; teamCategoriesReady: boolean }>;
   create(draft: CoachAccountDraft): Promise<CoachAccountResult>;
-  createTeam(id: string, name: string): Promise<{ id: string; name: string }>;
+  createTeam(id: string, name: string, category?: ExerciseTeamCategory | null): Promise<Team>;
+  setTeamCategory(team: Team, category: ExerciseTeamCategory | null): Promise<Team>;
   updateAccess(request: CoachAccessUpdate): Promise<CoachAccessResult>;
 }
 export const demoUsersRepository: UsersRepository = {
@@ -14,6 +19,7 @@ export const demoUsersRepository: UsersRepository = {
   async load() { throw new Error('La demo no gestiona cuentas reales.'); },
   async create() { throw new Error('La demo no gestiona cuentas reales.'); },
   async createTeam() { throw new Error('La demo no gestiona cuentas reales.'); },
+  async setTeamCategory() { throw new Error('La demo no gestiona cuentas reales.'); },
   async updateAccess() { throw new Error('La demo no gestiona cuentas reales.'); },
 };
 function check(error: { code?: string } | null) {
@@ -31,13 +37,13 @@ export function remoteUsersRepository(client: SupabaseClient): UsersRepository {
     async load() {
       const ready = await client.rpc('admin_user_setup_ready'); check(ready.error);
       if (ready.data !== 1) throw new UsersSetupRequired('database');
-      const teams = await client.from('teams').select('id,name').order('name'); check(teams.error);
+      const { teams, teamCategoriesReady } = await loadTeams(client);
       const users: ClubUser[] = [];
       for (let offset = 0; ; offset += 100) {
         const result = await client.rpc('admin_list_users', { p_offset: offset, p_limit: 100 }); check(result.error);
         const rows = (result.data ?? []) as { user_id: string; email: string; display_name: string; role: 'coach' | 'admin'; enabled: boolean; team_ids: string[] }[];
         users.push(...rows.map(row => ({ id: row.user_id, email: row.email, name: row.display_name, role: row.role, enabled: row.enabled, teamIds: row.team_ids })));
-        if (rows.length < 100) return { users, teams: teams.data ?? [] };
+        if (rows.length < 100) return { users, teams, teamCategoriesReady };
       }
     },
     async create(draft) {
@@ -58,10 +64,25 @@ export function remoteUsersRepository(client: SupabaseClient): UsersRepository {
       if (result.data?.id !== clean.id || result.data?.email !== clean.email || typeof result.data?.replayed !== 'boolean') throw userCreationFailure('NETWORK');
       return { id: result.data.id, email: result.data.email, replayed: result.data.replayed };
     },
-    async createTeam(id, name) {
-      const result = await client.rpc('admin_create_team', { p_id: id, p_name: name.trim().replace(/\s+/g, ' ') });
+    async createTeam(id, name, category) {
+      const clean = name.trim().replace(/\s+/g, ' ');
+      const result = category === undefined
+        ? await client.rpc('admin_create_team', { p_id: id, p_name: clean })
+        : await client.rpc('admin_create_team_with_category', { p_id: id, p_name: clean, p_category: validateTeamCategory(category) });
+      if (category !== undefined && result.error && ['PGRST202', '42883'].includes(result.error.code ?? '')) throw new TeamCategoriesSetupRequired();
+      if (result.error?.code === '40001') throw new Error('El equipo ya existe con otros datos. Actualiza los usuarios antes de editarlo.');
       check(result.error);
-      if (result.data?.id !== id) throw new Error('No se pudo confirmar el equipo. Reintenta con el mismo nombre.');
+      if (result.data?.id !== id || result.data?.name !== clean || (category !== undefined && result.data?.category !== category)) throw new Error('No se pudo confirmar el equipo. Reintenta con los mismos datos.');
+      return result.data;
+    },
+    async setTeamCategory(team, category) {
+      const clean = validateTeamCategory(category);
+      const result = await client.rpc('admin_set_team_category', { p_team: team.id, p_category: clean, p_expected_category: team.category ?? null });
+      if (result.error && ['PGRST202', '42883'].includes(result.error.code ?? '')) throw new TeamCategoriesSetupRequired();
+      if (result.error?.code === '40001') throw new Error('Otro administrador ha cambiado la categoría. Cierra el formulario y pulsa Actualizar usuarios antes de editarla.');
+      if (result.error?.code === '42501') throw new Error('Solo un administrador activo puede cambiar la categoría de un equipo.');
+      if (result.error && ['22023', '22P02', '23514'].includes(result.error.code ?? '')) throw new Error('Revisa el equipo y la categoría seleccionados.');
+      if (result.error || result.data?.id !== team.id || result.data?.category !== clean) throw new Error('No se pudo confirmar la categoría. Revisa la conexión y reintenta con los mismos datos.');
       return result.data;
     },
     async updateAccess(request) {

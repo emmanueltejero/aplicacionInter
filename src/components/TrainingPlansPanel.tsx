@@ -9,14 +9,15 @@ import { filterTrainingPlans, trainingTotals } from '../trainingPlans';
 import type { TrainingRepository } from '../data/trainingRepository';
 import { TrainingSetupRequired } from '../data/trainingRepository';
 import type { ExercisesRepository } from '../data/exercisesRepository';
+import type { ExerciseTeamCategory } from '../exercises';
 import { TrainingEditor } from './TrainingEditor';
 import { TrainingTotals } from './TrainingTotals';
 import { TrainingCopyDialog } from './TrainingCopyDialog';
 import { trainingStyles as s } from './trainingStyles';
 
 const setupUrl = 'https://github.com/emmanueltejero/aplicacionInter/blob/main/supabase/migrations/202611100002_training_plans.sql';
-export function TrainingPlansPanel({ teamId, teamName, initialPlayers, repository, exercisesRepository, onBusyChange }: {
-  teamId: string; teamName: string; initialPlayers: number; repository: TrainingRepository; exercisesRepository: ExercisesRepository; onBusyChange: (busy: boolean) => void;
+export function TrainingPlansPanel({ teamId, teamName, teamCategory, initialPlayers, repository, exercisesRepository, onBusyChange }: {
+  teamId: string; teamName: string; teamCategory?: ExerciseTeamCategory | null; initialPlayers: number; repository: TrainingRepository; exercisesRepository: ExercisesRepository; onBusyChange: (busy: boolean) => void;
 }) {
   const { training_id, create_training, calendar_date } = useLocalSearchParams<{ training_id?: string; create_training?: string; calendar_date?: string }>();
   const initialDate = calendarDate(calendar_date);
@@ -113,7 +114,7 @@ export function TrainingPlansPanel({ teamId, teamName, initialPlayers, repositor
         </View>;
       })}
     </>}
-    {editor && <TrainingEditor key={editor.plan?.id ?? 'new'} plan={editor.plan} initialDate={initialDate ? dateKey(initialDate) : undefined} initialPlayers={initialPlayers} exercisesRepository={exercisesRepository} busy={busy} onSave={async request => { await save(request); setFilters({ from: request.date, to: request.date, includeArchived: request.archived }); }} onClose={closeEditor} />}
+    {editor && <TrainingEditor key={editor.plan?.id ?? 'new'} plan={editor.plan} initialDate={initialDate ? dateKey(initialDate) : undefined} initialPlayers={initialPlayers} recommendedCategory={teamCategory} exercisesRepository={exercisesRepository} busy={busy} onSave={async request => { await save(request); setFilters({ from: request.date, to: request.date, includeArchived: request.archived }); }} onClose={closeEditor} />}
     {copySource && <TrainingCopyDialog key={copySource.id} source={copySource} busy={busy} onCopy={copy} onClose={() => setCopySource(null)} />}
     {detail && <Modal visible transparent animationType="fade" onRequestClose={() => { if (!busy) closeDetail(); }}><View style={s.overlay}><View style={s.modal}><ScrollView contentContainerStyle={s.modalContent}>
       <Text style={s.title}>{detail.title}</Text><Text style={s.blue}>{detail.date}{detail.archivedAt ? ' · Archivado' : ''}</Text><TrainingTotals entries={detail.entries} playerCount={detail.playerCount} />

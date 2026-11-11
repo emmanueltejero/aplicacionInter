@@ -190,6 +190,16 @@ Los ejercicios anteriores quedan **Sin clasificar**, no se consideran automátic
 
 Requiere [202611100006_exercise_team_categories.sql](supabase/migrations/202611100006_exercise_team_categories.sql). Conserva autores, contenido, revisiones, permisos y planes existentes. Los entrenamientos y PDF siguen usando sus fichas históricas; las etiquetas de equipo sirven para elegir ejercicios en la biblioteca. La API anterior conserva las etiquetas al editar o archivar desde una pestaña antigua. La interfaz puede consultar las fichas antes de activar el SQL y avisa al intentar guardar; nunca anuncia una clasificación guardada sin confirmación. Se han probado validaciones, permisos, reintentos, clientes anteriores, historial y filtros móviles combinados.
 
+## Categoría de cada equipo y recomendaciones al entrenar
+
+Un administrador puede abrir **Menú → Usuarios del club → Categorías de equipos** y asignar a cada equipo una de las categorías del club, por ejemplo **Alevín** al **Alevín B**. También puede elegirla al crear un equipo o dejarlo **Sin categoría**. La asignación se guarda en `teams.category`, no se deduce del nombre. Los equipos existentes empiezan sin categoría y conservan nombres, entrenadores, plantillas e historial.
+
+En **Entrenar → Crear/Editar entrenamiento → Añadir ejercicios de la biblioteca**, los ejercicios etiquetados para la categoría del equipo aparecen primero, con **Recomendado para Alevín**, por ejemplo. Los demás ejercicios siguen disponibles; dentro de cada grupo se conserva el orden alfabético. Los filtros de búsqueda, favoritos, contenido y categoría siguen delimitando la selección. Un ejercicio sin clasificar no se considera recomendado y los archivados siguen excluidos de las nuevas incorporaciones. Cambiar la categoría del equipo o el orden sugerido no altera los bloques de una sesión ni sus copias o PDF.
+
+Para activarlo ejecuta [202611110003_team_categories.sql](supabase/migrations/202611110003_team_categories.sql) en Supabase después del SQL de usuarios. No requiere desplegar otra Edge Function. La ampliación conserva la creación anterior de equipos; las cuentas sin el nuevo SQL pueden seguir usando sus equipos y la biblioteca. Las nuevas APIs validan la categoría, exigen administrador activo y rechazan una edición desactualizada; los reintentos idénticos confirman el resultado sin duplicar equipos ni sobrescribir una categoría posterior.
+
+Se han comprobado orden, combinación de filtros, permisos y conservación de datos con PostgreSQL local y flujos de móvil con respuestas simuladas. Tras activar el SQL, asigna la categoría a los equipos reales y recarga en los otros dispositivos para recoger el cambio.
+
 ## Instalar la web en un dispositivo
 
 Abre [la web del club](https://emmanueltejero.github.io/aplicacionInter/) en un navegador externo a ChatGPT o WhatsApp. El botón **Instalar** abre el diálogo del navegador cuando está disponible y, en otros casos, muestra estas instrucciones:

@@ -148,3 +148,13 @@ Ejecuta [202611110002_exercise_favorites.sql](migrations/202611110002_exercise_f
 La tabla `exercise_favorites` contiene una fila por usuario y ejercicio, con una clave compuesta que evita duplicados. RLS permite consultar únicamente la lista del usuario autenticado y activo; el rol administrador no permite consultar las listas de otros. La función `set_exercise_favorite` obtiene el propietario de la sesión y establece explícitamente el estado, sin permitir escrituras directas ni aceptar un propietario del cliente. Las cuentas desactivadas, ajenas al club o anónimas no pueden usarla. Las referencias se eliminan si desaparece la cuenta o la ficha; archivar conserva la selección.
 
 Para verificarlo, guarda un favorito desde una cuenta y abre la misma cuenta en otro navegador: debe aparecer en **Mis favoritos**, también al crear un entrenamiento. Otra cuenta debe tener su propia selección. Marca y desmarca, actualiza y comprueba que se conserva el último estado; la biblioteca, sus imágenes y las sesiones guardadas deben seguir iguales.
+
+## Asociar una categoría a cada equipo
+
+Ejecuta [202611110003_team_categories.sql](migrations/202611110003_team_categories.sql) en **SQL Editor → New query → Run**, después de activar usuarios desde la web. Se puede repetir, conserva los datos actuales y no requiere cambios en la función Edge `club-users`. Después recarga la web.
+
+Desde una cuenta administradora, abre **Menú → Usuarios del club → Categorías de equipos**, asigna por ejemplo **Alevín** al **Alevín B** y guarda. Los equipos existentes empiezan **Sin categoría**, sin inferencias por nombre. Al crear equipos nuevos también se puede elegir su categoría. Las opciones coinciden con las recomendaciones de la biblioteca: Minis, Prebenjamín, Benjamín, Alevín, Infantil, Cadete, Juvenil, Femenino y Regional.
+
+La tabla `teams` incorpora `category`, nullable y con valores validados. `admin_create_team_with_category` crea nombre y categoría de forma atómica; `admin_set_team_category` compara el valor esperado antes de cambiarlo. Ambas exigen administrador activo, usan la sesión del cliente y admiten reintentos seguros. RLS sigue limitando las lecturas a los equipos asignados y no se conceden escrituras directas. La API de creación anterior sigue funcionando y conserva la categoría al confirmar equipos ya creados.
+
+Verifica el cambio abriendo un entrenamiento del equipo: sus ejercicios recomendados deben aparecer primero y los demás seguir disponibles. Cambia de equipo y comprueba que usa su propia categoría. Los favoritos, plantillas, asistencia, partidos y sesiones guardadas deben conservarse. En otros dispositivos, recarga para recoger la categoría actualizada.
