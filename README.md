@@ -49,6 +49,8 @@ El esquema y las políticas están implementados y probados localmente. Su aplic
 
 La interfaz usa azul y negro como colores del club. La cabecera usa el escudo original del club, conservado sin modificaciones en `assets/club-crest.jpg`. La demo portátil incluye la imagen dentro del HTML y no necesita descargarla de Internet.
 
+En el área del equipo la cabecera ocupa una sola fila compacta con el escudo, el nombre del equipo y **Menú**. El menú reúne el cambio de equipo, **Usuarios del club** para administradores y el cierre de sesión; la lista de equipos ya no ocupa la parte superior de cada pantalla. El resumen del equipo y las pestañas también reducen su espacio vertical para mostrar antes el contenido en móviles.
+
 ```sh
 npm run demo:build
 ```
@@ -151,7 +153,7 @@ El documento queda completo en el archivo y se puede consultar sin conexión. Lo
 
 ## Alta de usuarios desde la web
 
-Los administradores activos disponen de **Usuarios del club**, accesible desde la cabecera y desde Mis equipos, incluso sin equipos creados. Permite consultar y buscar los miembros del club, crear equipos y dar de alta entrenadores con nombre, correo, contraseña inicial y uno o varios equipos. Desde **Equipos y acceso** también pueden cambiar los equipos y activar o desactivar entrenadores existentes. Los nuevos usuarios tienen rol `coach`; las cuentas de administrador se gestionan desde Supabase. El alta no cambia la sesión del administrador ni envía correos automáticamente.
+Los administradores activos disponen de **Usuarios del club**, accesible desde **Menú → Usuarios del club** y desde Mis equipos, incluso sin equipos creados. Permite consultar y buscar los miembros del club, crear equipos y dar de alta entrenadores con nombre, correo, contraseña inicial y uno o varios equipos. Desde **Equipos y acceso** también pueden cambiar los equipos y activar o desactivar entrenadores existentes. Los nuevos usuarios tienen rol `coach`; las cuentas de administrador se gestionan desde Supabase. El alta no cambia la sesión del administrador ni envía correos automáticamente.
 
 Para activarlo, sigue [la guía de Usuarios](supabase/WEB-USERS.md): ejecuta [el SQL de usuarios](supabase/migrations/202611100004_web_users.sql) y despliega [la función `club-users`](supabase/functions/club-users/index.ts) en Supabase. La función usa las credenciales privadas del entorno de Edge Functions; el navegador conserva únicamente su clave Publishable y la sesión del usuario. GitHub Pages no despliega esa función. La comprobación JWT del gateway se desactiva solo para ella; el código valida cada sesión mediante Auth y comprueba la membresía de administrador en cada petición.
 

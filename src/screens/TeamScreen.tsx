@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -13,6 +13,7 @@ import { ExercisesLibrary } from '../components/ExercisesLibrary';
 import { TrainingPlansPanel } from '../components/TrainingPlansPanel';
 import { TeamCalendar } from '../components/TeamCalendar';
 import { calendarDate } from '../teamCalendar';
+import { trainingStyles as menuStyles } from '../components/trainingStyles';
 
 const options: { value: Attendance; label: string; short: string; color: string; bg: string }[] = [
   { value: 'present', label: 'Presente', short: 'Sí', color: '#176BA0', bg: '#DEEEFB' },
@@ -35,6 +36,7 @@ export default function TeamScreen({ team, teams, repository, onLeave, isAdmin =
   const [editor, setEditor] = useState<{ player?: Player } | null>(null);
   const [reportFilters, setReportFilters] = useState(() => initialReportFilters());
   const [showArchived, setShowArchived] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const locked = useRef(false);
   const key = dateKey(date);
   const day = register[key] ?? {};
@@ -46,6 +48,10 @@ export default function TeamScreen({ team, teams, repository, onLeave, isAdmin =
   const calendarKey = dateKey(calendarDate(calendar_date) ?? new Date());
   function selectDate(value: Date) { router.setParams({ attendance_date: dateKey(value) }); }
   function changeTab(value: string) { router.setParams({ view: value, training_id: undefined, match_id: undefined, create_training: undefined, create_match: undefined }); }
+  function chooseTeam(id: string) {
+    setMenuOpen(false);
+    router.setParams({ team: id, training_id: undefined, match_id: undefined, create_training: undefined, create_match: undefined });
+  }
 
   async function load() {
     try {
@@ -93,20 +99,14 @@ export default function TeamScreen({ team, teams, repository, onLeave, isAdmin =
   return (
     <SafeAreaView style={styles.safe}>
       <StatusBar style="light" />
-      <View style={styles.header}>
+      <View style={styles.header} accessibilityLabel="Cabecera del equipo">
         <View style={styles.headerInner}>
-          <View style={styles.brand}><View style={styles.badge}><Image source={require('../../assets/club-crest.jpg')} style={styles.crest} resizeMode="contain" accessibilityLabel="Escudo del Inter Playa Honda" /></View><View style={styles.brandCopy}><Text style={styles.eyebrow}>ÁREA DE ENTRENADORES</Text><Text style={styles.club}>Inter Playa Honda</Text></View></View>
-          <View style={styles.demoPill}><Text style={styles.demoText}>{repository.demo ? 'DEMOSTRACIÓN' : 'ACCESO DEL CLUB'}</Text></View>
-          {isAdmin && <Pressable accessibilityRole="button" accessibilityLabel="Gestionar usuarios" disabled={saving} style={styles.exit} onPress={() => router.setParams({ view: 'users' })}><Text style={styles.demoText}>Usuarios del club</Text></Pressable>}
-          <Pressable accessibilityRole="button" disabled={saving} onPress={() => { void onLeave().catch(() => setError('No se pudo cerrar la sesión. Inténtalo de nuevo.')); }} style={styles.exit}><Text style={styles.demoText}>{repository.demo ? 'Salir de la demo' : 'Cerrar sesión'}</Text></Pressable>
+          <View style={styles.brand}><View style={styles.badge}><Image source={require('../../assets/club-crest.jpg')} style={styles.crest} resizeMode="contain" accessibilityLabel="Escudo del Inter Playa Honda" /></View><View style={styles.brandCopy}><Text numberOfLines={1} style={styles.club}>Inter Playa Honda</Text><Text numberOfLines={1} style={styles.headerTeam}>{repository.demo ? 'Demo · ' : ''}{team.name}</Text></View></View>
+          <Pressable accessibilityRole="button" accessibilityLabel="Abrir menú del equipo" disabled={saving} style={styles.menuButton} onPress={() => setMenuOpen(true)}><Text style={styles.menuText}>Menú</Text></Pressable>
         </View>
       </View>
       <ScrollView contentContainerStyle={styles.content}>
-        {teams.length > 1 && <View style={styles.teamChoices}>{teams.map(item => <Pressable key={item.id} accessibilityRole="button" accessibilityState={{ selected: item.id === team.id }} disabled={saving} onPress={() => router.setParams({ team: item.id, training_id: undefined, match_id: undefined, create_training: undefined, create_match: undefined })} style={styles.teamChoice}><Text style={styles.today}>{item.name}</Text></Pressable>)}</View>}
-        <Text style={styles.kicker}>TU EQUIPO · INTER PLAYA HONDA</Text>
-        <Text style={styles.title}>Cada jugador cuenta.</Text>
-        <Text style={styles.subtitle}>El día a día del equipo, en un mismo lugar.</Text>
-        <View style={styles.teamCard}><View><Text style={styles.teamName}>{team.name}</Text><Text style={styles.muted}>{activePlayers.length} jugadores activos{repository.demo ? ' · Datos ficticios' : ''}</Text></View><Text style={styles.ball}>⚽</Text></View>
+        <View style={styles.teamCard}><View style={styles.teamCopy}><Text style={styles.teamName}>{team.name}</Text><Text style={styles.muted}>{activePlayers.length} jugadores activos{repository.demo ? ' · Datos ficticios' : ''}</Text></View>{teams.length > 1 && <Pressable accessibilityRole="button" accessibilityLabel="Cambiar equipo" disabled={saving} style={styles.changeTeam} onPress={() => setMenuOpen(true)}><Text style={styles.today}>Cambiar equipo</Text></Pressable>}</View>
         <View style={styles.tabs}>
           {([{ id: 'attendance', label: 'Pasar lista' }, { id: 'team', label: 'Plantilla' }, { id: 'summary', label: 'Resumen' }, { id: 'matches', label: 'Partidos' }, { id: 'exercises', label: 'Ejercicios' }, { id: 'training', label: 'Entrenar' }, { id: 'calendar', label: 'Calendario' }] as const).map(item => (
             <Pressable key={item.id} accessibilityRole="tab" accessibilityState={{ selected: tab === item.id }} disabled={saving} onPress={() => changeTab(item.id)} style={[styles.tab, tab === item.id && styles.tabActive]}><Text style={[styles.tabText, tab === item.id && styles.tabTextActive]}>{item.label}</Text></Pressable>
@@ -159,6 +159,15 @@ export default function TeamScreen({ team, teams, repository, onLeave, isAdmin =
         <View style={styles.next}><Text style={styles.nextTitle}>Del plan al campo</Text><Text style={styles.nextText}>Consulta el entrenamiento del día en «Entrenar» y registra la asistencia en «Pasar lista».</Text></View>
         <Text style={styles.footer}>{repository.demo ? 'Demo con datos ficticios. Los cambios se guardan solo en este dispositivo.' : 'Acceso privado del club. Los cambios se guardan en el servidor; hace falta conexión.'}</Text>
       </ScrollView>
+      {menuOpen && <Modal visible transparent animationType="fade" onRequestClose={() => setMenuOpen(false)}><View style={menuStyles.overlay}><View style={menuStyles.modal}>
+        <ScrollView contentContainerStyle={menuStyles.modalContent}>
+          <Text style={menuStyles.title}>Menú del equipo</Text><Text style={menuStyles.subtitle}>{team.name}</Text><Text style={menuStyles.small}>{repository.demo ? 'Demostración · Datos ficticios' : 'Acceso del club · Inter Playa Honda'}</Text>
+          {isAdmin && <Pressable accessibilityRole="button" accessibilityLabel="Gestionar usuarios" disabled={saving} style={menuStyles.secondary} onPress={() => { setMenuOpen(false); router.setParams({ view: 'users' }); }}><Text style={menuStyles.blue}>Usuarios del club</Text></Pressable>}
+          <Pressable accessibilityRole="button" disabled={saving} style={menuStyles.secondary} onPress={() => { setMenuOpen(false); void onLeave().catch(() => setError('No se pudo cerrar la sesión. Inténtalo de nuevo.')); }}><Text style={menuStyles.blue}>{repository.demo ? 'Salir de la demo' : 'Cerrar sesión'}</Text></Pressable>
+          {teams.length > 1 && <><Text style={menuStyles.subtitle}>Cambiar de equipo</Text>{teams.map(item => <Pressable key={item.id} accessibilityRole="button" aria-pressed={item.id === team.id} disabled={saving} style={[menuStyles.secondary, item.id === team.id && menuStyles.selected]} onPress={() => chooseTeam(item.id)}><Text style={menuStyles.blue}>{item.name}</Text></Pressable>)}</>}
+        </ScrollView>
+        <View style={styles.menuFooter}><Pressable accessibilityRole="button" style={menuStyles.primary} onPress={() => setMenuOpen(false)}><Text style={menuStyles.white}>Cerrar menú</Text></Pressable></View>
+      </View></View></Modal>}
       {editor && <PlayerEditor key={editor.player?.id ?? 'new'} player={editor.player} roster={roster} busy={saving} onSave={savePlayer} onClose={() => setEditor(null)} />}
     </SafeAreaView>
   );
@@ -168,28 +177,23 @@ const styles = StyleSheet.create({
   clearMark: { minHeight: 44, alignSelf: 'flex-end', justifyContent: 'center', paddingHorizontal: 12 },
   primary: { minHeight: 48, backgroundColor: '#176BA0', borderRadius: 8, alignItems: 'center', justifyContent: 'center', marginBottom: 16 }, primaryText: { color: '#FFF', fontWeight: '700' },
   actions: { flexDirection: 'row', gap: 12 }, action: { minHeight: 44, paddingHorizontal: 12, justifyContent: 'center' },
-  exit: { alignSelf: 'flex-start', paddingVertical: 8 }, teamChoices: { gap: 8, marginBottom: 16 }, teamChoice: { borderWidth: 1, borderColor: '#DAE2EB', borderRadius: 8, padding: 4 },
+  teamChoice: { borderWidth: 1, borderColor: '#DAE2EB', borderRadius: 8, padding: 4 },
   safe: { flex: 1, backgroundColor: '#F4F6F9' },
-  header: { backgroundColor: '#10151D', paddingHorizontal: 20, paddingTop: 22, paddingBottom: 24 },
-  headerInner: { width: '100%', maxWidth: 760, alignSelf: 'center', gap: 16 },
-  brand: { flexDirection: 'row', gap: 12, alignItems: 'center' },
-  badge: { width: 64, height: 64, backgroundColor: '#FFFFFF', borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  crest: { width: 56, height: 56 },
-  brandCopy: { flex: 1 },
-  eyebrow: { color: '#AAC3D7', fontSize: 10, fontWeight: '700', letterSpacing: 1.5 },
-  club: { color: '#FFFFFF', fontSize: 23, fontWeight: '800', marginTop: 4 },
-  demoPill: { alignSelf: 'flex-start', backgroundColor: '#15344F', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 6 },
-  demoText: { color: '#C5E8FF', fontSize: 10, letterSpacing: 1.3, fontWeight: '700' },
-  content: { width: '100%', maxWidth: 800, alignSelf: 'center', padding: 20, paddingBottom: 40 },
-  kicker: { fontSize: 10, letterSpacing: 1.3, color: '#416985', fontWeight: '700', marginTop: 8 },
-  title: { fontSize: 30, lineHeight: 37, color: '#111820', fontWeight: '800', marginTop: 10 },
-  subtitle: { fontSize: 15, color: '#637282', lineHeight: 23, marginTop: 6 },
-  teamCard: { padding: 20, backgroundColor: '#FFF', borderRadius: 16, marginVertical: 24, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderWidth: 1, borderColor: '#DFE5EC' },
-  teamName: { color: '#17212D', fontSize: 18, fontWeight: '700', marginBottom: 7 },
-  muted: { color: '#5D6D7E', fontSize: 12 }, ball: { fontSize: 28 },
-  tabs: { flexDirection: 'row', flexWrap: 'wrap', borderBottomWidth: 1, borderColor: '#D7E0EA', marginBottom: 25 },
-  tab: { flex: 1, minWidth: 90, minHeight: 48, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6, paddingBottom: 13, paddingTop: 5, borderBottomWidth: 3, borderColor: 'transparent' },
-  tabActive: { borderColor: '#176BA0' }, tabText: { fontSize: 15, fontWeight: '600', color: '#607184' }, tabTextActive: { color: '#176BA0' },
+  header: { backgroundColor: '#10151D', paddingHorizontal: 12, paddingVertical: 8 },
+  headerInner: { width: '100%', maxWidth: 760, alignSelf: 'center', gap: 8, flexDirection: 'row', alignItems: 'center' },
+  brand: { flex: 1, minWidth: 0, flexDirection: 'row', gap: 10, alignItems: 'center' },
+  badge: { width: 40, height: 40, backgroundColor: '#FFF', borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  crest: { width: 34, height: 34 }, brandCopy: { flex: 1, minWidth: 0 },
+  club: { color: '#FFF', fontSize: 16, fontWeight: '800' }, headerTeam: { color: '#AAC3D7', fontSize: 12, marginTop: 2 },
+  menuButton: { minHeight: 44, minWidth: 60, paddingHorizontal: 10, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#35516A', borderRadius: 8 },
+  menuText: { color: '#FFF', fontSize: 13, fontWeight: '700' }, menuFooter: { padding: 12, borderTopWidth: 1, borderColor: '#DFE5EC' },
+  content: { width: '100%', maxWidth: 800, alignSelf: 'center', padding: 12, paddingBottom: 32 },
+  teamCard: { padding: 12, backgroundColor: '#FFF', borderRadius: 10, marginBottom: 10, gap: 8, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderWidth: 1, borderColor: '#DFE5EC' },
+  teamCopy: { flex: 1, minWidth: 0 }, changeTeam: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 6 },
+  teamName: { color: '#17212D', fontSize: 16, fontWeight: '700', marginBottom: 3 }, muted: { color: '#5D6D7E', fontSize: 12 },
+  tabs: { flexDirection: 'row', flexWrap: 'wrap', borderBottomWidth: 1, borderColor: '#D7E0EA', marginBottom: 12 },
+  tab: { flex: 1, minWidth: 72, minHeight: 44, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4, paddingVertical: 8, borderBottomWidth: 3, borderColor: 'transparent' },
+  tabActive: { borderColor: '#176BA0' }, tabText: { fontSize: 13, fontWeight: '600', color: '#607184' }, tabTextActive: { color: '#176BA0' },
   sectionHeading: { gap: 8, marginBottom: 16 }, sectionTitle: { fontSize: 19, fontWeight: '700', color: '#17212D' },
   small: { fontSize: 10, color: '#61758A', fontWeight: '600', letterSpacing: 0.5 },
   dateBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#E5EFF8', borderRadius: 12, padding: 5, marginBottom: 16 },
