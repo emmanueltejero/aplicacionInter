@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { dateKey, formatDateInput } from '../domain';
+import { dateKey } from '../domain';
+import { DateField } from './DateField';
 import type { Player } from '../domain';
 import { newMatchId, validateMatch } from '../matches';
 import type { Match, MatchDraft } from '../matches';
@@ -27,7 +28,7 @@ export function MatchEditor({ match, initialDate, roster, busy, onSave, onClose,
     <View style={s.overlay}><View style={s.card}><ScrollView contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
       <Text style={s.title}>{readOnly ? 'Consultar partido' : match ? 'Editar partido' : 'Crear partido'}</Text>
       <Text style={s.label}>Rival</Text><TextInput accessibilityLabel="Rival" style={s.input} value={draft.opponent} onChangeText={opponent => setDraft({ ...draft, opponent })} maxLength={100} editable={!locked} />
-      <View style={s.fields}><View style={s.field}><Text style={s.label}>Fecha</Text><TextInput accessibilityLabel="Fecha del partido" style={s.input} value={draft.date} onChangeText={date => setDraft({ ...draft, date: formatDateInput(date) })} placeholder="AAAA-MM-DD" keyboardType="number-pad" maxLength={10} editable={!locked} /></View><View style={s.field}><Text style={s.label}>Duración (min)</Text><TextInput accessibilityLabel="Duración del partido" style={s.input} value={draft.duration} onChangeText={duration => setDraft({ ...draft, duration })} keyboardType="number-pad" maxLength={3} editable={!locked} /></View></View>
+      <View style={s.fields}><View style={s.field}><Text style={s.label}>Fecha</Text><DateField label="Fecha del partido" value={draft.date} onChange={date => setDraft(current => ({ ...current, date }))} disabled={locked} /></View><View style={s.field}><Text style={s.label}>Duración (min)</Text><TextInput accessibilityLabel="Duración del partido" style={s.input} value={draft.duration} onChangeText={duration => setDraft({ ...draft, duration })} keyboardType="number-pad" maxLength={3} editable={!locked} /></View></View>
       <View style={s.fields}>{([{ value: 'home', label: 'Local' }, { value: 'away', label: 'Visitante' }] as const).map(item => <Pressable key={item.value} accessibilityRole="radio" accessibilityLabel={item.label} accessibilityState={{ checked: draft.venue === item.value }} style={s.secondary} disabled={locked} onPress={() => setDraft({ ...draft, venue: item.value })}><Text style={s.blue}>{draft.venue === item.value ? '● ' : '○ '}{item.label}</Text></Pressable>)}</View>
       <Pressable accessibilityRole="checkbox" accessibilityLabel="Partido disputado" accessibilityState={{ checked: draft.played }} style={s.secondary} disabled={locked} onPress={() => setDraft({ ...draft, played: !draft.played })}><Text style={s.blue}>{draft.played ? '☑' : '☐'} Partido disputado</Text></Pressable>
       <Text style={s.text}>{readOnly ? 'Consulta la convocatoria y los minutos registrados. El equipo está archivado.' : 'Selecciona los convocados. Los minutos se contabilizan al marcar el partido como disputado. Un campo vacío queda pendiente; 0 indica que no jugó.'}</Text>

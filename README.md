@@ -113,9 +113,15 @@ Los partidos se vuelven a cargar al entrar en Resumen, por lo que las ediciones 
 
 ## Corregir y buscar asistencia a entrenamientos
 
-En **Pasar lista**, **Buscar asistencia por fecha → Ver fecha** abre directamente cualquier día válido, conservando las flechas y el acceso a hoy. La consulta no crea registros. **Quitar marca** devuelve al jugador a **Sin marcar**, actualiza los contadores y lo excluye del cálculo del porcentaje de ese día; las demás fechas y jugadores se conservan. Las marcas de jugadores archivados se mantienen hasta restaurar al jugador.
+En **Pasar lista**, **Buscar asistencia por fecha** abre un calendario desplegable: elige día, mes y año y pulsa **Usar fecha** para consultar directamente ese día. Se conservan las flechas y el acceso a hoy. La consulta no crea registros. **Quitar marca** devuelve al jugador a **Sin marcar**, actualiza los contadores y lo excluye del cálculo del porcentaje de ese día; las demás fechas y jugadores se conservan. Las marcas de jugadores archivados se mantienen hasta restaurar al jugador.
 
 Para usar **Quitar marca** con las cuentas reales, ejecuta la [ampliación SQL de asistencia](supabase/migrations/202611090003_clear_attendance.sql), siguiendo [la guía de Supabase](supabase/README.md#activar-quitar-marca-en-asistencia). El permiso queda limitado por RLS a los equipos autorizados y jugadores activos. La demo permite probarlo sin SQL. Si el servidor rechaza la operación, la interfaz conserva la marca y muestra el error.
+
+### Selección de fechas sin escribir
+
+La búsqueda de asistencia, **Fecha del partido**, **Fecha del entrenamiento** y **Buscar en el calendario** utilizan el mismo selector. El campo muestra **DD/MM/AAAA** y un botón desplegable; abre un calendario con días, elección de mes y año, navegación y acceso a hoy. **Usar fecha** confirma y **Cancelar fecha** conserva la fecha anterior. En un formulario, elegir una fecha conserva nombre, notas, convocatoria y bloques sin guardarlos hasta confirmar el formulario; en las búsquedas navega al día elegido directamente. Los equipos archivados mantienen sus campos de edición deshabilitados.
+
+El selector usa componentes compartidos de React Native, sin campos de texto ni dependencias nuevas; la web instalable y los clientes nativos usan la misma interfaz. Las fechas siguen guardándose como **AAAA-MM-DD**, con mediodía local para los cálculos, y ajustan correctamente los días al cambiar a meses más cortos o a años no bisiestos. No requiere cambios en Supabase. Las pruebas cubren fechas bisiestas, años completos, cancelación, formularios con borrador, guardado, navegación y cambios de hora; los recorridos web se comprueban con datos ficticios en tamaños móvil y escritorio.
 
 ## Biblioteca compartida de ejercicios
 

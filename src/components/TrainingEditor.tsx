@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ComponentRef } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
-import { dateKey, formatDateInput } from '../domain';
+import { dateKey } from '../domain';
+import { DateField } from './DateField';
 import { exerciseCategories, filterExercises, recommendedExercisesFirst } from '../exercises';
 import type { Exercise, ExerciseCategory, ExerciseTeamCategory, ExerciseTeamCategoryFilter as TeamFilter } from '../exercises';
 import type { ExercisesRepository } from '../data/exercisesRepository';
@@ -72,7 +73,7 @@ export function TrainingEditor({ plan, initialDate, initialPlayers, recommendedC
     <Text style={s.title}>{plan ? 'Editar entrenamiento' : 'Crear entrenamiento'}</Text>
     <Text style={s.text}>Elige ejercicios y organiza su secuencia. Cambiar su duración aquí no modifica la biblioteca.</Text>
     <Text style={s.label}>Nombre del entrenamiento</Text><TextInput accessibilityLabel="Nombre del entrenamiento" style={s.input} value={draft.title} onChangeText={title => setDraft({ ...draft, title })} maxLength={100} editable={!busy} />
-    <View style={s.fields}><View style={s.field}><Text style={s.label}>Fecha</Text><TextInput accessibilityLabel="Fecha del entrenamiento" style={s.input} value={draft.date} onChangeText={date => setDraft({ ...draft, date: formatDateInput(date) })} placeholder="AAAA-MM-DD" keyboardType="number-pad" maxLength={10} editable={!busy} /></View><View style={s.field}><Text style={s.label}>Jugadores previstos</Text><TextInput accessibilityLabel="Jugadores previstos" style={s.input} value={draft.playerCount} onChangeText={playerCount => setDraft({ ...draft, playerCount })} keyboardType="number-pad" maxLength={3} editable={!busy} /></View></View>
+    <View style={s.fields}><View style={s.field}><Text style={s.label}>Fecha</Text><DateField label="Fecha del entrenamiento" value={draft.date} onChange={date => setDraft(current => ({ ...current, date }))} disabled={busy} /></View><View style={s.field}><Text style={s.label}>Jugadores previstos</Text><TextInput accessibilityLabel="Jugadores previstos" style={s.input} value={draft.playerCount} onChangeText={playerCount => setDraft({ ...draft, playerCount })} keyboardType="number-pad" maxLength={3} editable={!busy} /></View></View>
     <Text style={s.label}>Notas del entrenamiento</Text><TextInput accessibilityLabel="Notas del entrenamiento" style={[s.input, s.notes]} multiline value={draft.notes} onChangeText={notes => setDraft({ ...draft, notes })} maxLength={3000} editable={!busy} />
     <Text onLayout={event => { sequenceY.current = event.nativeEvent.layout.y; }} accessibilityLiveRegion="polite" style={s.subtitle}>Secuencia · {draft.entries.length} {draft.entries.length === 1 ? 'ejercicio' : 'ejercicios'}</Text>
     {!draft.entries.length && <Text style={s.text}>Añade el primer ejercicio desde la biblioteca.</Text>}
