@@ -11,6 +11,7 @@ import { newRecordId } from '../recordId';
 import { TrainingTotals } from './TrainingTotals';
 import { ExerciseTeamCategoryFilter, ExerciseTeamCategoriesSetup } from './ExerciseTeamCategoryFilter';
 import { trainingStyles as s } from './trainingStyles';
+import { ExerciseMedia } from './ExerciseMedia';
 
 export function TrainingEditor({ plan, initialDate, initialPlayers, exercisesRepository, busy, onSave, onClose }: {
   plan?: TrainingPlan; initialDate?: string; initialPlayers: number; exercisesRepository: ExercisesRepository; busy: boolean;
@@ -30,6 +31,7 @@ export function TrainingEditor({ plan, initialDate, initialPlayers, exercisesRep
   const [expanded, setExpanded] = useState<string | null>(null);
   const scroll = useRef<ComponentRef<typeof ScrollView>>(null);
   const sequenceY = useRef(0);
+  const [previewExercise, setPreviewExercise] = useState<string | null>(null);
   useEffect(() => {
     let active = true;
     exercisesRepository.load().then(data => { if (active) { setLibrary(data.exercises); setTeamCategoriesReady(data.teamCategoriesReady !== false); setLibraryError(''); } })
@@ -76,7 +78,7 @@ export function TrainingEditor({ plan, initialDate, initialPlayers, exercisesRep
           <Pressable accessibilityRole="button" accessibilityLabel={`Quitar ejercicio ${index + 1}`} disabled={busy} style={s.secondary} onPress={() => setDraft({ ...draft, entries: draft.entries.filter(item => item.id !== entry.id) })}><Text style={s.blue}>Quitar</Text></Pressable>
         </View>
         <Pressable accessibilityRole="button" accessibilityLabel={`Ver desarrollo del ejercicio ${index + 1}`} accessibilityState={{ expanded: expanded === entry.id }} style={s.secondary} onPress={() => setExpanded(expanded === entry.id ? null : entry.id)}><Text style={s.blue}>{expanded === entry.id ? 'Ocultar desarrollo' : 'Ver desarrollo'}</Text></Pressable>
-        {expanded === entry.id && <><Text style={s.text}>{entry.description}</Text><Text style={s.small}>Material: {entry.materials.map(item => `${item.quantity} ${item.name}`).join(' · ') || 'Sin material'}</Text></>}
+        {expanded === entry.id && <><Text style={s.text}>{entry.description}</Text><ExerciseMedia imagePath={entry.imagePath} videoUrl={entry.videoUrl} /><Text style={s.small}>Material: {entry.materials.map(item => `${item.quantity} ${item.name}`).join(' · ') || 'Sin material'}</Text></>}
       </View>;
     })}
     <TrainingTotals entries={draft.entries} playerCount={count} />
@@ -99,6 +101,8 @@ export function TrainingEditor({ plan, initialDate, initialPlayers, exercisesRep
             <Text style={s.subtitle}>{exercise.title}</Text><Text style={s.small}>{exercise.duration} min · {exercise.minPlayers}–{exercise.maxPlayers} jugadores · {exercise.spaceLength} × {exercise.spaceWidth} m</Text>
             <Text style={s.small}>Categorías de equipo: {exercise.teamCategories?.length ? exercise.teamCategories.join(' · ') : 'Sin clasificar'}</Text>
             <Text accessibilityLiveRegion="polite" style={added ? s.blue : s.small}>{added ? `✓ Añadido a esta sesión: ${added} ${added === 1 ? 'vez' : 'veces'}` : 'Todavía no está en esta sesión'}</Text>
+            {(exercise.imagePath || exercise.videoUrl) && <Pressable accessibilityRole="button" accessibilityLabel={`Ver imagen o vídeo de ${exercise.title}`} style={s.secondary} onPress={() => setPreviewExercise(value => value === exercise.id ? null : exercise.id)}><Text style={s.blue}>{previewExercise === exercise.id ? 'Ocultar imagen y vídeo' : 'Ver imagen y vídeo'}</Text></Pressable>}
+            {previewExercise === exercise.id && <ExerciseMedia imagePath={exercise.imagePath} videoUrl={exercise.videoUrl} />}
             <Pressable accessibilityRole="button" accessibilityLabel={`${added ? 'Añadir otra vez' : 'Añadir'} ${exercise.title} al entrenamiento`} disabled={busy || draft.entries.length >= 50} style={s.secondary} onPress={() => add(exercise)}><Text style={s.blue}>{added ? 'Añadir otra vez' : 'Añadir al entrenamiento'}</Text></Pressable>
           </View>;
         })}

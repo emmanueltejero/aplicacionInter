@@ -5,6 +5,10 @@ import type { Exercise, ExerciseDraft } from '../exercises';
 import type { ExerciseSave } from '../data/exercisesRepository';
 import { newRecordId } from '../recordId';
 import { ExerciseTeamCategoriesSetup } from './ExerciseTeamCategoryFilter';
+import { ExerciseMedia } from './ExerciseMedia';
+import { ExerciseImagePicker } from './ExerciseImagePicker';
+import type { PreparedExerciseImage } from '../exerciseMedia';
+import { ExerciseMediaSetup } from './ExerciseMediaSetup';
 
 export function ExerciseEditor({ exercise, busy, onSave, onClose }: {
   exercise?: Exercise; busy: boolean; onSave: (exercise: ExerciseSave) => Promise<void>; onClose: () => void;
@@ -12,20 +16,30 @@ export function ExerciseEditor({ exercise, busy, onSave, onClose }: {
   const [id] = useState(() => exercise?.id ?? newRecordId());
   const [draft, setDraft] = useState(() => exerciseDraft(exercise));
   const [error, setError] = useState('');
+  const [imageUpload, setImageUpload] = useState<PreparedExerciseImage | undefined>();
+  const [imagePreparing, setImagePreparing] = useState(false);
   function field(key: keyof Pick<ExerciseDraft, 'duration' | 'minPlayers' | 'maxPlayers' | 'spaceLength' | 'spaceWidth'>, label: string) {
     return <View style={s.field}><Text style={s.label}>{label}</Text><TextInput accessibilityLabel={label} style={s.input} value={draft[key]} onChangeText={value => setDraft({ ...draft, [key]: value })} keyboardType="number-pad" maxLength={3} editable={!busy} /></View>;
   }
   async function save() {
-    if (busy) return;
-    try { setError(''); await onSave({ ...validateExercise(draft), teamCategories: validateExerciseTeamCategories(draft.teamCategories), id, revision: exercise?.revision ?? 0, archived: !!exercise?.archivedAt }); }
+    if (busy || imagePreparing) return;
+    try { setError(''); await onSave({ ...validateExercise(draft), imageUpload, teamCategories: validateExerciseTeamCategories(draft.teamCategories), id, revision: exercise?.revision ?? 0, archived: !!exercise?.archivedAt }); }
     catch (cause) { setError(cause instanceof Error ? cause.message : 'No se pudo guardar el ejercicio.'); }
   }
-  return <Modal visible transparent animationType="fade" onRequestClose={() => { if (!busy) onClose(); }}>
+  return <Modal visible transparent animationType="fade" onRequestClose={() => { if (!busy && !imagePreparing) onClose(); }}>
     <View style={s.overlay}><View style={s.card}><ScrollView contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
       <Text style={s.title}>{exercise ? 'Editar ejercicio' : 'Añadir ejercicio'}</Text>
       <Text style={s.text}>Se compartirá con todos los entrenadores del club. Solo su autor y los administradores pueden modificarlo.</Text>
       <Text style={s.label}>Nombre del ejercicio</Text><TextInput accessibilityLabel="Nombre del ejercicio" style={s.input} value={draft.title} onChangeText={title => setDraft({ ...draft, title })} maxLength={100} editable={!busy} />
       <Text style={s.label}>Descripción y desarrollo</Text><TextInput accessibilityLabel="Descripción del ejercicio" style={[s.input, s.description]} multiline value={draft.description} onChangeText={description => setDraft({ ...draft, description })} maxLength={5000} editable={!busy} />
+      <Text style={s.subtitle}>Imagen o esquema</Text><Text style={s.text}>Una imagen por ejercicio. La reducimos a un máximo de 200 KB antes de subirla; se conserva completa, sin recortar.</Text>
+      <ExerciseMedia imagePath={draft.imagePath} preview={imageUpload?.dataUrl} />
+      <ExerciseImagePicker disabled={busy || imagePreparing} onPick={setImageUpload} onProcessing={setImagePreparing} />
+      {imagePreparing && <Text accessibilityLiveRegion="polite" style={s.blue}>Preparando imagen…</Text>}
+      {imageUpload && <Text accessibilityLiveRegion="polite" style={s.blue}>Imagen preparada: {Math.ceil(imageUpload.bytes / 1024)} KB. Se subirá al guardar el ejercicio.</Text>}
+      {(imageUpload || draft.imagePath) && <Pressable accessibilityRole="button" disabled={busy || imagePreparing} style={s.secondary} onPress={() => { setImageUpload(undefined); setDraft({ ...draft, imagePath: null }); }}><Text style={s.blue}>Quitar imagen de la ficha</Text></Pressable>}
+      <Text style={s.label}>Enlace a vídeo · YouTube o Vimeo</Text><TextInput accessibilityLabel="Enlace al vídeo del ejercicio" style={s.input} value={draft.videoUrl ?? ''} onChangeText={videoUrl => setDraft({ ...draft, videoUrl })} autoCapitalize="none" keyboardType="url" maxLength={1000} editable={!busy} placeholder="https://…" />
+      <Text style={s.text}>El vídeo se abre desde su enlace y no ocupa espacio de archivos del club.</Text>
       <Text style={s.label}>Contenido del ejercicio · elige uno o varios</Text>
       <View style={s.wrap}>{exerciseCategories.map(category => {
         const checked = draft.categories.includes(category);
@@ -51,8 +65,9 @@ export function ExerciseEditor({ exercise, busy, onSave, onClose }: {
       <Pressable accessibilityRole="button" disabled={busy || draft.materials.length >= 30} style={s.secondary} onPress={() => setDraft({ ...draft, materials: [...draft.materials, { name: '', quantity: '1' }] })}><Text style={s.blue}>Añadir material</Text></Pressable>
       {!!error && <Text accessibilityRole="alert" style={s.error}>{error}</Text>}
       {error.includes('202611100006_exercise_team_categories.sql') && <ExerciseTeamCategoriesSetup />}
-      <Pressable accessibilityRole="button" disabled={busy} style={s.primary} onPress={() => void save()}><Text style={s.white}>{busy ? 'Guardando…' : 'Guardar ejercicio'}</Text></Pressable>
-      <Pressable accessibilityRole="button" disabled={busy} style={s.secondary} onPress={onClose}><Text style={s.blue}>Cancelar</Text></Pressable>
+      {error.includes('202611110001_exercise_media.sql') && <ExerciseMediaSetup />}
+      <Pressable accessibilityRole="button" disabled={busy || imagePreparing} style={s.primary} onPress={() => void save()}><Text style={s.white}>{busy ? 'Guardando…' : 'Guardar ejercicio'}</Text></Pressable>
+      <Pressable accessibilityRole="button" disabled={busy || imagePreparing} style={s.secondary} onPress={onClose}><Text style={s.blue}>Cancelar</Text></Pressable>
     </ScrollView></View></View>
   </Modal>;
 }

@@ -1,8 +1,9 @@
 import { jsPDF } from 'jspdf';
 import { trainingDocument } from './trainingDocument.ts';
 import type { TrainingPlan } from './trainingPlans';
+import { exerciseImageBytes, jpegDimensions } from './exerciseMedia.ts';
 
-export type TrainingPdfAssets = { font: string; boldFont: string; crest: string };
+export type TrainingPdfAssets = { font: string; boldFont: string; crest: string; images?: Record<string, string> };
 export function createTrainingPdf(plan: TrainingPlan, teamName: string, assets: TrainingPdfAssets): jsPDF {
   const content = trainingDocument(plan, teamName);
   const pdf = new jsPDF({ unit: 'mm', format: 'a4', compress: true, putOnlyUsedFonts: true });
@@ -39,6 +40,19 @@ export function createTrainingPdf(plan: TrainingPlan, teamName: string, assets: 
     if (y + headingLines * 6 + 14 > bottom) nextPage();
     y += 3; paragraph(section.heading, 12, true, '#176BA0');
     for (const text of section.paragraphs) paragraph(text);
+    if (section.imagePath) {
+      const data = assets.images?.[section.imagePath];
+      if (!data) throw new Error('Falta cargar una imagen del entrenamiento.');
+      const dimensions = jpegDimensions(exerciseImageBytes(data));
+      const scale = Math.min(width / dimensions.width, 100 / dimensions.height), w = dimensions.width * scale, h = dimensions.height * scale;
+      if (y + h + 4 > bottom) nextPage();
+      pdf.addImage(data, 'JPEG', left + (width - w) / 2, y, w, h, section.imagePath); y += h + 5;
+    }
+    if (section.videoUrl) {
+      if (y + 8 > bottom) nextPage();
+      pdf.setFont('InterSans', 'normal'); pdf.setFontSize(10); pdf.setTextColor('#176BA0');
+      pdf.textWithLink('Ver vídeo del ejercicio', left, y, { url: section.videoUrl }); y += 8;
+    }
   }
   const pages = pdf.getNumberOfPages();
   for (let page = 1; page <= pages; page++) {

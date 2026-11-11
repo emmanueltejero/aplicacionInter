@@ -6,6 +6,8 @@ import { ExercisesSetupRequired } from '../data/exercisesRepository';
 import type { ExerciseLibrary, ExerciseSave, ExercisesRepository } from '../data/exercisesRepository';
 import { ExerciseEditor } from './ExerciseEditor';
 import { ExerciseTeamCategoryFilter, ExerciseTeamCategoriesSetup } from './ExerciseTeamCategoryFilter';
+import { ExerciseMedia } from './ExerciseMedia';
+import { ExerciseMediaSetup } from './ExerciseMediaSetup';
 
 const setupUrl = 'https://github.com/emmanueltejero/aplicacionInter/blob/main/supabase/migrations/202611100001_exercises.sql';
 export function ExercisesLibrary({ repository, onBusyChange }: { repository: ExercisesRepository; onBusyChange?: (busy: boolean) => void }) {
@@ -52,6 +54,7 @@ export function ExercisesLibrary({ repository, onBusyChange }: { repository: Exe
     <Pressable accessibilityRole="button" style={s.primary} disabled={busy} onPress={() => { setError(''); setEditor({}); }}><Text style={s.white}>Añadir ejercicio</Text></Pressable>
     <TextInput accessibilityLabel="Buscar ejercicios" placeholder="Buscar por nombre, descripción o material" placeholderTextColor="#718096" style={s.input} value={query} onChangeText={setQuery} />
     {library.teamCategoriesReady === false && <ExerciseTeamCategoriesSetup />}
+    {library.mediaReady === false && <ExerciseMediaSetup />}
     <ExerciseTeamCategoryFilter value={teamCategory} onChange={setTeamCategory} disabled={library.teamCategoriesReady === false} />
     <Text style={s.label}>Filtrar por contenido</Text>
     <View style={s.controls}><Pressable accessibilityRole="radio" accessibilityLabel="Todas las categorías" accessibilityState={{ checked: category === '' }} style={[s.secondary, !category && s.selected]} onPress={() => setCategory('')}><Text style={s.blue}>Todas</Text></Pressable>{exerciseCategories.map(item => <Pressable key={item} accessibilityRole="radio" accessibilityLabel={`Filtrar ${item}`} accessibilityState={{ checked: category === item }} style={[s.secondary, category === item && s.selected]} onPress={() => setCategory(item)}><Text style={s.blue}>{item}</Text></Pressable>)}</View>
@@ -64,6 +67,7 @@ export function ExercisesLibrary({ repository, onBusyChange }: { repository: Exe
       <Text style={s.author}>{exercise.createdBy === library.viewer.id ? 'Añadido por ti' : 'Compartido por otro entrenador'}{exercise.archivedAt ? ' · Archivado' : ''}</Text>
       <View style={s.controls}>{exercise.categories.map(item => <Text key={item} style={s.tag}>{item}</Text>)}</View>
       <Text style={s.text}>Categorías de equipo: {exercise.teamCategories?.length ? exercise.teamCategories.join(' · ') : 'Sin clasificar'}</Text>
+      {(exercise.imagePath || exercise.videoUrl) && <Text style={s.author}>{[exercise.imagePath ? 'Con imagen o esquema' : '', exercise.videoUrl ? 'Con vídeo' : ''].filter(Boolean).join(' · ')}</Text>}
       <Text style={s.text}>{exercise.duration} min · {exercise.minPlayers === exercise.maxPlayers ? exercise.minPlayers : `${exercise.minPlayers}–${exercise.maxPlayers}`} jugadores · {exercise.spaceLength} × {exercise.spaceWidth} m</Text>
       <Text style={s.text} numberOfLines={3}>{exercise.description}</Text>
       <Text style={s.text}>Material: {exercise.materials.length ? exercise.materials.map(item => `${item.quantity} ${item.name}`).join(' · ') : 'Sin material'}</Text>
@@ -79,6 +83,7 @@ export function ExercisesLibrary({ repository, onBusyChange }: { repository: Exe
     {editor && <ExerciseEditor key={editor.exercise?.id ?? 'new'} exercise={editor.exercise} busy={busy} onSave={async request => { await save(request); setQuery(''); setCategory(''); setTeamCategory(''); if (request.archived) setIncludeArchived(true); }} onClose={() => setEditor(null)} />}
     {detail && <Modal visible transparent animationType="fade" onRequestClose={() => setDetail(null)}><View style={s.overlay}><View style={s.detail}><ScrollView contentContainerStyle={s.detailContent}>
       <Text style={s.title}>{detail.title}</Text><Text style={s.text}>{detail.categories.join(' · ')}{detail.archivedAt ? ' · Archivado' : ''}</Text>
+      <ExerciseMedia imagePath={detail.imagePath} videoUrl={detail.videoUrl} />
       <Text style={s.text}>Categorías de equipo: {detail.teamCategories?.length ? detail.teamCategories.join(' · ') : 'Sin clasificar'}</Text>
       <Text style={s.text}>{detail.duration} minutos · {detail.minPlayers}–{detail.maxPlayers} jugadores</Text><Text style={s.text}>Espacio: {detail.spaceLength} × {detail.spaceWidth} m ({detail.spaceLength * detail.spaceWidth} m²)</Text>
       <Text style={s.label}>Descripción y desarrollo</Text><Text style={s.description}>{detail.description}</Text><Text style={s.label}>Material</Text>

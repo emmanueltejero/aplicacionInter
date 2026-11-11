@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Linking, Modal, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { calendarDate } from '../teamCalendar';
+import { ExerciseMedia } from './ExerciseMedia';
 import { dateKey, formatDateInput } from '../domain';
 import type { TrainingCopy, TrainingPlan, TrainingSave } from '../trainingPlans';
 import { filterTrainingPlans, trainingTotals } from '../trainingPlans';
@@ -122,7 +123,7 @@ export function TrainingPlansPanel({ teamId, teamName, initialPlayers, repositor
       {!!detail.notes && <><Text style={s.label}>Notas</Text><Text style={s.text}>{detail.notes}</Text></>}
       {trainingTotals(detail.entries, detail.playerCount).timeline.map((time, index) => {
         const entry = detail.entries[index];
-        return <View key={entry.id} style={s.card}><Text style={s.subtitle}>{index + 1}. {entry.title}</Text><Text style={s.blue}>Minuto {time.start}–{time.end} · {entry.duration} min</Text><Text style={s.small}>{entry.categories.join(' · ')} · {entry.minPlayers}–{entry.maxPlayers} jugadores · {entry.spaceLength} × {entry.spaceWidth} m</Text><Text style={s.text}>{entry.description}</Text><Text style={s.text}>Material: {entry.materials.map(item => `${item.quantity} ${item.name}`).join(' · ') || 'Sin material'}</Text></View>;
+        return <View key={entry.id} style={s.card}><Text style={s.subtitle}>{index + 1}. {entry.title}</Text><Text style={s.blue}>Minuto {time.start}–{time.end} · {entry.duration} min</Text><Text style={s.small}>{entry.categories.join(' · ')} · {entry.minPlayers}–{entry.maxPlayers} jugadores · {entry.spaceLength} × {entry.spaceWidth} m</Text><Text style={s.text}>{entry.description}</Text><ExerciseMedia imagePath={entry.imagePath} videoUrl={entry.videoUrl} /><Text style={s.text}>Material: {entry.materials.map(item => `${item.quantity} ${item.name}`).join(' · ') || 'Sin material'}</Text></View>;
       })}
       <Text style={s.small}>Las fichas de este plan se conservan como se guardaron, aunque cambie la biblioteca.</Text><Pressable accessibilityRole="button" style={s.primary} disabled={busy} onPress={closeDetail}><Text style={s.white}>Cerrar plan</Text></Pressable>
     </ScrollView></View></View></Modal>}

@@ -1,3 +1,4 @@
+import { exerciseMediaFields } from './exerciseMedia.ts';
 export const exerciseCategories = ['Calentamiento', 'Técnica', 'Táctica', 'Posesión', 'Finalización', 'Defensa', 'Preparación física', 'Porteros'] as const;
 export type ExerciseCategory = typeof exerciseCategories[number];
 export const exerciseTeamCategories = ['Minis', 'Prebenjamín', 'Benjamín', 'Alevín', 'Infantil', 'Cadete', 'Juvenil', 'Femenino', 'Regional'] as const;
@@ -7,6 +8,7 @@ export type Material = { name: string; quantity: number };
 export type ExerciseInput = {
   title: string; description: string; categories: ExerciseCategory[]; duration: number;
   minPlayers: number; maxPlayers: number; spaceLength: number; spaceWidth: number; materials: Material[];
+  imagePath?: string | null; videoUrl?: string | null;
 };
 export type Exercise = ExerciseInput & {
   id: string; createdBy: string | null; revision: number; archivedAt: string | null; teamCategories?: ExerciseTeamCategory[];
@@ -28,7 +30,7 @@ export function canEditExercise(exercise: Exercise, viewer: ExerciseViewer) {
 }
 export function exerciseDraft(exercise?: Exercise): ExerciseDraft {
   return exercise ? { ...exercise, teamCategories: exercise.teamCategories === undefined ? [] : [...validateExerciseTeamCategories(exercise.teamCategories)], duration: String(exercise.duration), minPlayers: String(exercise.minPlayers), maxPlayers: String(exercise.maxPlayers), spaceLength: String(exercise.spaceLength), spaceWidth: String(exercise.spaceWidth), materials: exercise.materials.map(item => ({ ...item, quantity: String(item.quantity) })) }
-    : { title: '', description: '', categories: [], teamCategories: [], duration: '', minPlayers: '', maxPlayers: '', spaceLength: '', spaceWidth: '', materials: [] };
+    : { title: '', description: '', categories: [], teamCategories: [], imagePath: null, videoUrl: '', duration: '', minPlayers: '', maxPlayers: '', spaceLength: '', spaceWidth: '', materials: [] };
 }
 const clean = (value: string) => value.trim().replace(/\s+/g, ' ');
 function integer(value: string, max: number, label: string) {
@@ -56,7 +58,7 @@ export function validateExercise(draft: ExerciseDraft): ExerciseInput {
     names.add(key);
     return { name, quantity: integer(item.quantity, 1000, `Cantidad de ${name}`) };
   });
-  return { title, description, categories: [...draft.categories], duration, minPlayers, maxPlayers, spaceLength, spaceWidth, materials };
+  return { title, description, categories: [...draft.categories], duration, minPlayers, maxPlayers, spaceLength, spaceWidth, materials, ...exerciseMediaFields(draft) };
 }
 export const normalizeExerciseSearch = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('es');
 export function filterExercises(exercises: Exercise[], query: string, category: ExerciseCategory | '', includeArchived: boolean, teamCategory: ExerciseTeamCategoryFilter = '') {
