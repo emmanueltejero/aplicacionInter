@@ -21,4 +21,6 @@ export const trainingStyles = StyleSheet.create({
   overlay: { flex: 1, padding: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: '#10151D99' },
   modal: { width: '100%', maxWidth: 700, maxHeight: '94%', backgroundColor: '#FFF', borderRadius: 16, overflow: 'hidden' },
   modalContent: { padding: 18, gap: 14 },
+  pickerFooter: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, backgroundColor: '#E5EFF8', borderTopWidth: 1, borderColor: '#DAE2EB' },
+  pickerFooterCopy: { flex: 1, minWidth: 0, gap: 3 },
 });

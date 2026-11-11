@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import type { ComponentRef } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { dateKey, formatDateInput } from '../domain';
 import { exerciseCategories, filterExercises } from '../exercises';
@@ -27,6 +28,8 @@ export function TrainingEditor({ plan, initialDate, initialPlayers, exercisesRep
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState<ExerciseCategory | ''>('');
   const [expanded, setExpanded] = useState<string | null>(null);
+  const scroll = useRef<ComponentRef<typeof ScrollView>>(null);
+  const sequenceY = useRef(0);
   useEffect(() => {
     let active = true;
     exercisesRepository.load().then(data => { if (active) { setLibrary(data.exercises); setTeamCategoriesReady(data.teamCategoriesReady !== false); setLibraryError(''); } })
@@ -36,7 +39,7 @@ export function TrainingEditor({ plan, initialDate, initialPlayers, exercisesRep
   function add(exercise: Exercise) {
     if (busy || draft.entries.length >= 50) return;
     const entry = entryFromExercise(exercise, newRecordId());
-    setDraft(current => ({ ...current, entries: [...current.entries, { ...entry, duration: String(entry.duration) }] }));
+    setDraft(current => current.entries.length >= 50 ? current : { ...current, entries: [...current.entries, { ...entry, duration: String(entry.duration) }] });
   }
   function move(index: number, offset: number) {
     if (busy || index + offset < 0 || index + offset >= draft.entries.length) return;
@@ -51,13 +54,15 @@ export function TrainingEditor({ plan, initialDate, initialPlayers, exercisesRep
   }
   const count = /^\d+$/.test(draft.playerCount) && Number(draft.playerCount) >= 1 && Number(draft.playerCount) <= 100 ? Number(draft.playerCount) : null;
   const totals = trainingTotals(draft.entries, count);
-  return <Modal visible transparent animationType="fade" onRequestClose={() => { if (!busy) onClose(); }}><View style={s.overlay}><View style={s.modal}><ScrollView contentContainerStyle={s.modalContent} keyboardShouldPersistTaps="handled">
+  const occurrences = new Map<string, number>();
+  for (const entry of draft.entries) occurrences.set(entry.exerciseId, (occurrences.get(entry.exerciseId) ?? 0) + 1);
+  return <Modal visible transparent animationType="fade" onRequestClose={() => { if (!busy) onClose(); }}><View style={s.overlay}><View style={s.modal}><ScrollView ref={scroll} contentContainerStyle={s.modalContent} keyboardShouldPersistTaps="handled">
     <Text style={s.title}>{plan ? 'Editar entrenamiento' : 'Crear entrenamiento'}</Text>
     <Text style={s.text}>Elige ejercicios y organiza su secuencia. Cambiar su duración aquí no modifica la biblioteca.</Text>
     <Text style={s.label}>Nombre del entrenamiento</Text><TextInput accessibilityLabel="Nombre del entrenamiento" style={s.input} value={draft.title} onChangeText={title => setDraft({ ...draft, title })} maxLength={100} editable={!busy} />
     <View style={s.fields}><View style={s.field}><Text style={s.label}>Fecha</Text><TextInput accessibilityLabel="Fecha del entrenamiento" style={s.input} value={draft.date} onChangeText={date => setDraft({ ...draft, date: formatDateInput(date) })} placeholder="AAAA-MM-DD" keyboardType="number-pad" maxLength={10} editable={!busy} /></View><View style={s.field}><Text style={s.label}>Jugadores previstos</Text><TextInput accessibilityLabel="Jugadores previstos" style={s.input} value={draft.playerCount} onChangeText={playerCount => setDraft({ ...draft, playerCount })} keyboardType="number-pad" maxLength={3} editable={!busy} /></View></View>
     <Text style={s.label}>Notas del entrenamiento</Text><TextInput accessibilityLabel="Notas del entrenamiento" style={[s.input, s.notes]} multiline value={draft.notes} onChangeText={notes => setDraft({ ...draft, notes })} maxLength={3000} editable={!busy} />
-    <Text accessibilityLiveRegion="polite" style={s.subtitle}>Secuencia · {draft.entries.length} {draft.entries.length === 1 ? 'ejercicio' : 'ejercicios'}</Text>
+    <Text onLayout={event => { sequenceY.current = event.nativeEvent.layout.y; }} accessibilityLiveRegion="polite" style={s.subtitle}>Secuencia · {draft.entries.length} {draft.entries.length === 1 ? 'ejercicio' : 'ejercicios'}</Text>
     {!draft.entries.length && <Text style={s.text}>Añade el primer ejercicio desde la biblioteca.</Text>}
     {draft.entries.map((entry, index) => {
       const time = totals.timeline[index];
@@ -88,11 +93,27 @@ export function TrainingEditor({ plan, initialDate, initialPlayers, exercisesRep
         <Text style={s.label}>Contenido del ejercicio</Text>
         <View style={s.controls}><Pressable accessibilityRole="radio" accessibilityLabel="Todas las categorías para entrenamiento" accessibilityState={{ checked: !category }} style={[s.secondary, !category && s.selected]} onPress={() => setCategory('')}><Text style={s.blue}>Todas</Text></Pressable>{exerciseCategories.map(item => <Pressable key={item} accessibilityRole="radio" accessibilityLabel={`Categoría para entrenamiento ${item}`} accessibilityState={{ checked: category === item }} style={[s.secondary, category === item && s.selected]} onPress={() => setCategory(item)}><Text style={s.blue}>{item}</Text></Pressable>)}</View>
         {!filterExercises(library, query, category, false, teamCategoriesReady ? teamCategory : '').length && <Text style={s.text}>{library.some(item => !item.archivedAt) ? 'No hay ejercicios con estos filtros.' : 'Añade ejercicios en la pestaña Ejercicios para empezar a planificar.'}</Text>}
-        {filterExercises(library, query, category, false, teamCategoriesReady ? teamCategory : '').map(exercise => <View key={exercise.id} style={s.card}><Text style={s.subtitle}>{exercise.title}</Text><Text style={s.small}>{exercise.duration} min · {exercise.minPlayers}–{exercise.maxPlayers} jugadores · {exercise.spaceLength} × {exercise.spaceWidth} m</Text><Text style={s.small}>Categorías de equipo: {exercise.teamCategories?.length ? exercise.teamCategories.join(' · ') : 'Sin clasificar'}</Text><Pressable accessibilityRole="button" accessibilityLabel={`Añadir ${exercise.title} al entrenamiento`} disabled={busy || draft.entries.length >= 50} style={s.secondary} onPress={() => add(exercise)}><Text style={s.blue}>Añadir al entrenamiento</Text></Pressable></View>)}
+        {filterExercises(library, query, category, false, teamCategoriesReady ? teamCategory : '').map(exercise => {
+          const added = occurrences.get(exercise.id) ?? 0;
+          return <View key={exercise.id} accessibilityLabel={`Ficha para añadir: ${exercise.title}`} style={[s.card, added > 0 && s.selected]}>
+            <Text style={s.subtitle}>{exercise.title}</Text><Text style={s.small}>{exercise.duration} min · {exercise.minPlayers}–{exercise.maxPlayers} jugadores · {exercise.spaceLength} × {exercise.spaceWidth} m</Text>
+            <Text style={s.small}>Categorías de equipo: {exercise.teamCategories?.length ? exercise.teamCategories.join(' · ') : 'Sin clasificar'}</Text>
+            <Text accessibilityLiveRegion="polite" style={added ? s.blue : s.small}>{added ? `✓ Añadido a esta sesión: ${added} ${added === 1 ? 'vez' : 'veces'}` : 'Todavía no está en esta sesión'}</Text>
+            <Pressable accessibilityRole="button" accessibilityLabel={`${added ? 'Añadir otra vez' : 'Añadir'} ${exercise.title} al entrenamiento`} disabled={busy || draft.entries.length >= 50} style={s.secondary} onPress={() => add(exercise)}><Text style={s.blue}>{added ? 'Añadir otra vez' : 'Añadir al entrenamiento'}</Text></Pressable>
+          </View>;
+        })}
       </>}
     </View>}
     {!!error && <Text accessibilityRole="alert" style={s.error}>{error}</Text>}
     <Pressable accessibilityRole="button" disabled={busy} style={s.primary} onPress={() => void save()}><Text style={s.white}>{busy ? 'Guardando…' : 'Guardar entrenamiento'}</Text></Pressable>
     <Pressable accessibilityRole="button" disabled={busy} style={s.secondary} onPress={onClose}><Text style={s.blue}>Cancelar</Text></Pressable>
-  </ScrollView></View></View></Modal>;
+  </ScrollView>
+  {picker && <View style={s.pickerFooter} accessibilityLabel="Resumen de la sesión en preparación">
+    <View style={s.pickerFooterCopy}>
+      <Text accessibilityLiveRegion="polite" style={s.blue}>En esta sesión: {draft.entries.length} {draft.entries.length === 1 ? 'ejercicio' : 'ejercicios'} · {totals.minutes === null ? 'Duración pendiente' : `${totals.minutes} min`}</Text>
+      <Text style={s.small}>{draft.entries.length >= 50 ? 'Has llegado al máximo de 50 ejercicios.' : 'Pendiente de guardar el entrenamiento'}</Text>
+    </View>
+    <Pressable accessibilityRole="button" disabled={busy} style={s.primary} onPress={() => { setPicker(false); scroll.current?.scrollTo({ y: sequenceY.current, animated: true }); }}><Text style={s.white}>Ver sesión</Text></Pressable>
+  </View>}
+  </View></View></Modal>;
 }
