@@ -25,7 +25,7 @@ npm test
 npm start
 ```
 
-Abre el proyecto con una versión de Expo Go compatible con el SDK 58 en Android o iOS. El móvil debe poder alcanzar el servidor de desarrollo: el entorno en la nube no garantiza ese acceso. Para una instalación independiente será necesario preparar builds firmadas y las cuentas de distribución. No se han generado ni probado binarios nativos.
+Abre el proyecto con una versión de Expo Go compatible con el SDK 58 en Android o iOS. El móvil debe poder alcanzar el servidor de desarrollo: el entorno en la nube no garantiza ese acceso. La web publicada puede instalarse desde el navegador como PWA. Para distribuir una aplicación nativa en tiendas serán necesarios builds firmados y las cuentas de distribución. No se han generado ni probado binarios nativos.
 
 Para validar desde el entorno sin móvil:
 
@@ -55,7 +55,7 @@ npm run demo:build
 
 Genera `dist-portable/inter-playa-honda-demo.html`, un único archivo HTML sin recursos externos. Usa los jugadores y reglas de asistencia de `src/domain.ts`; permite probar fechas, alta/edición/archivo/restauración de jugadores y asistencia. Si el visor bloquea almacenamiento, avisa y mantiene las marcas durante la sesión. Es una demostración del flujo, no una aplicación instalada ni un sustituto de la versión Expo.
 
-Para distribuir como web instalable (PWA) todavía faltan el alojamiento HTTPS, el manifiesto con los iconos oficiales y la estrategia de actualización. El uso sin conexión y la sincronización de cambios con el servidor requieren diseño y pruebas específicos. No se ha desplegado una PWA ni publicado en tiendas.
+La exportación de GitHub Pages prepara una web instalable (PWA) con HTTPS, manifiesto, iconos del club y aviso sin conexión. Los datos del club requieren internet; no hay una cola de cambios ni sincronización offline. La demostración portátil de este apartado es un archivo independiente de esa PWA.
 
 ## Comprobación descargable del acceso real
 
@@ -81,7 +81,7 @@ EXPO_OFFLINE=1 npm run build:pages
 
 El directorio `dist/` contiene la web y el escudo; `.nojekyll` permite servir los recursos `_expo` y `404.html` proporciona la entrada para rutas. El flujo `.github/workflows/pages.yml` instala, valida, prueba y despliega únicamente `dist`, usando Node 24. Incluye la URL y la clave **Publishable**, que son configuración pública de cliente. No utiliza contraseñas ni credenciales `service_role`; los datos del club permanecen sujetos a los permisos de Supabase.
 
-Antes del primer despliegue, el propietario debe activar **Settings → Pages → Build and deployment → Source: GitHub Actions** en GitHub. Cada subida a `main` activa el flujo de publicación. Si el primer intento falló por Pages deshabilitado, actívalo y repite la ejecución desde Actions o sube un cambio nuevo. Revisar el resultado del flujo y probar el sitio HTTPS real antes de darlo por operativo. Esta versión no tiene todavía manifiesto ni caché offline de PWA.
+Antes del primer despliegue, el propietario debe activar **Settings → Pages → Build and deployment → Source: GitHub Actions** en GitHub. Cada subida a `main` activa el flujo de publicación. Si el primer intento falló por Pages deshabilitado, actívalo y repite la ejecución desde Actions o sube un cambio nuevo. Revisar el resultado del flujo y probar el sitio HTTPS real antes de darlo por operativo. La exportación añade el manifiesto y un service worker cuyo único contenido almacenado es el aviso público de conexión.
 
 La publicación del entorno de Codex y la publicación de esta web son operaciones distintas. Los archivos descargables del chat son auxiliares y no se necesitan para usar el sitio alojado.
 
@@ -177,3 +177,19 @@ Cada ficha puede recomendarse para varias categorías: Minis, Prebenjamín, Benj
 Los ejercicios anteriores quedan **Sin clasificar**, no se consideran automáticamente adecuados para todas las categorías. **Todas** permite consultarlos y **Sin clasificar** ayuda a localizarlos para completar sus etiquetas. No se asignan categorías a partir del nombre del equipo ni se limita el acceso a la biblioteca: es una recomendación que establece el autor o un administrador.
 
 Requiere [202611100006_exercise_team_categories.sql](supabase/migrations/202611100006_exercise_team_categories.sql). Conserva autores, contenido, revisiones, permisos y planes existentes. Los entrenamientos y PDF siguen usando sus fichas históricas; las etiquetas de equipo sirven para elegir ejercicios en la biblioteca. La API anterior conserva las etiquetas al editar o archivar desde una pestaña antigua. La interfaz puede consultar las fichas antes de activar el SQL y avisa al intentar guardar; nunca anuncia una clasificación guardada sin confirmación. Se han probado validaciones, permisos, reintentos, clientes anteriores, historial y filtros móviles combinados.
+
+## Instalar la web en un dispositivo
+
+Abre [la web del club](https://emmanueltejero.github.io/aplicacionInter/) en un navegador externo a ChatGPT o WhatsApp. El botón **Instalar** abre el diálogo del navegador cuando está disponible y, en otros casos, muestra estas instrucciones:
+
+- **Android, Chrome:** menú ⋮ → Añadir a pantalla de inicio / Instalar aplicación → confirmar.
+- **iPhone o iPad, Safari:** Compartir → Añadir a pantalla de inicio. Si aparece Abrir como app web, mantenerlo activado y añadir.
+- **Ordenador, Chrome o Edge:** icono de instalación de la barra de direcciones o la opción Instalar del menú.
+
+La aplicación usa el escudo del club como icono y se abre en su propia ventana en los navegadores compatibles. El aviso de instalación se oculta cuando se ejecuta en modo instalado; también se puede cerrar durante la visita actual. El inicio instalado utiliza una dirección fija sin equipo, contraseñas, enlaces de recuperación ni otros datos de usuario. Se puede iniciar sesión con la cuenta habitual del club; algunos dispositivos utilizan un almacenamiento de sesión independiente del navegador. No requiere cambios de SQL, de Supabase ni un dominio diferente.
+
+`npm run build:pages` genera `manifest.webmanifest`, iconos PNG 192/512, un icono maskable con margen, el icono de Apple 180 y `service-worker.js`, todos dentro de `/aplicacionInter/`. Los iconos se preparan con las utilidades de imágenes ya incluidas en Expo a partir del escudo original. El manifiesto mantiene un identificador estable para no duplicar la instalación al publicar cambios.
+
+El service worker consulta la red para las navegaciones de la aplicación y solo guarda `offline.html`, una página pública con el escudo incrustado y el botón **Reintentar conexión**. No almacena respuestas de Supabase, datos del club, sesiones ni páginas de recuperación en Cache Storage. Si se pierde la conexión, no se simula un guardado: hay que reconectar para consultar o modificar datos. Los PDF descargados se consultan desde el dispositivo.
+
+Las actualizaciones se comprueban desde el navegador con un worker versionado por el contenido exportado, eliminando únicamente las versiones antiguas de su propia caché. No fuerzan una recarga que cierre formularios abiertos; al volver a abrir o recargar la aplicación se consulta la versión publicada. Las pruebas verifican manifiesto, iconos, rutas, aislamiento de caché, avisos de instalación, navegación sin conexión y conservación de formularios durante una actualización. La comprobación automatizada en Chromium complementa la prueba final de instalación en un dispositivo real.

@@ -21,7 +21,7 @@
       "package": "com.interplayahonda.entrenadores"
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/club-crest.jpg"
     },
     "plugins": [
       "expo-router"
