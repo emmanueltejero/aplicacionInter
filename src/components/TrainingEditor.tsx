@@ -102,7 +102,7 @@ export function TrainingEditor({ plan, initialDate, initialPlayers, recommendedC
         <TextInput accessibilityLabel="Buscar ejercicios para el entrenamiento" style={s.input} value={query} onChangeText={setQuery} placeholder="Buscar por nombre, descripción o material" placeholderTextColor="#718096" />
         <ExerciseFavoritesFilter favorites={favorites} onlyFavorites={onlyFavorites} onChange={setOnlyFavorites} disabled={busy} />
         <ExerciseReviewsFilter reviews={reviews} onlyReviewed={onlyReviewed} onChange={setOnlyReviewed} disabled={busy} />
-        {recommendedCategory && teamCategoriesReady ? <Text style={s.blue}>Primero los recomendados para {recommendedCategory}. Los demás ejercicios siguen disponibles.</Text> : recommendedCategory === null && <Text style={s.small}>Este equipo aún no tiene categoría. Un administrador puede asignarla desde «Usuarios del club → Categorías de equipos».</Text>}
+        {recommendedCategory && teamCategoriesReady ? <Text style={s.blue}>Primero los recomendados para {recommendedCategory}. Los demás ejercicios siguen disponibles.</Text> : recommendedCategory === null && <Text style={s.small}>Este equipo aún no tiene categoría. Un administrador puede asignarla desde «Usuarios del club → Gestionar equipos».</Text>}
         {!teamCategoriesReady && <ExerciseTeamCategoriesSetup />}
         <ExerciseTeamCategoryFilter value={teamCategory} onChange={setTeamCategory} disabled={!teamCategoriesReady || busy} />
         <Text style={s.label}>Contenido del ejercicio</Text>

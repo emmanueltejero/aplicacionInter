@@ -14,11 +14,13 @@ import { TeamCategoryPicker, TeamCategoriesSetup } from './TeamCategoryPicker';
 import { TeamCategoryEditor } from './TeamCategoryEditor';
 import { ExerciseReviewerEditor } from './ExerciseReviewerEditor';
 import { ExerciseReviewsSetup } from './ExerciseReviews';
+import { TeamManagementDialog, TeamManagementSetup } from './TeamManagementDialog';
+import type { TeamAction } from './TeamManagementDialog';
 
 const guideUrl = 'https://github.com/emmanueltejero/aplicacionInter/blob/main/supabase/WEB-USERS.md';
 type Directory = Awaited<ReturnType<UsersRepository['load']>>;
-export function UsersPanel({ repository, onBusyChange, onTeamsChanged }: {
-  repository: UsersRepository; onBusyChange: (busy: boolean) => void; onTeamsChanged: (team: Team) => void;
+export function UsersPanel({ repository, onBusyChange, onTeamsChanged, onTeamDeleted, onOpenTeam }: {
+  repository: UsersRepository; onBusyChange: (busy: boolean) => void; onTeamsChanged: (team: Team) => void; onTeamDeleted: (id: string) => void; onOpenTeam: (team: Team) => void;
 }) {
   const [data, setData] = useState<Directory | null>(null);
   const [loadError, setLoadError] = useState<Error | null>(null);
@@ -36,6 +38,8 @@ export function UsersPanel({ repository, onBusyChange, onTeamsChanged }: {
   const [categoryEditor, setCategoryEditor] = useState<Team | null>(null);
   const [accessEditor, setAccessEditor] = useState<ClubUser | null>(null);
   const [reviewerEditor, setReviewerEditor] = useState<ClubUser | null>(null);
+  const [includeArchivedTeams, setIncludeArchivedTeams] = useState(false);
+  const [teamAction, setTeamAction] = useState<{ team: Team; action: TeamAction } | null>(null);
   useEffect(() => {
     let active = true;
     repository.load().then(result => { if (active) { setData(result); setLoadError(null); } })
@@ -76,6 +80,24 @@ export function UsersPanel({ repository, onBusyChange, onTeamsChanged }: {
       onTeamsChanged(team); setCategoryEditor(null); setNotice(`Categoría de ${team.name}: ${team.category ?? 'Sin categoría'}.`);
     } finally { locked.current = false; setBusy(false); onBusyChange(false); }
   }
+  async function manageTeam(name: string) {
+    if (locked.current || !teamAction) throw new Error('Espera a que termine la operación.');
+    locked.current = true; setBusy(true); onBusyChange(true); setNotice('');
+    const { team, action } = teamAction;
+    try {
+      if (action === 'delete') {
+        await repository.deleteEmptyTeam(team);
+        setData(current => current ? { ...current, teams: current.teams.filter(item => item.id !== team.id), users: current.users.map(user => ({ ...user, teamIds: user.teamIds.filter(id => id !== team.id) })) } : current);
+        onTeamDeleted(team.id); setNotice(`Equipo eliminado: ${team.name}. Las cuentas de los entrenadores se conservan.`);
+      } else {
+        const saved = action === 'rename' ? await repository.renameTeam(team, name) : await repository.archiveTeam(team, action === 'archive');
+        setData(current => current ? { ...current, teams: current.teams.map(item => item.id === saved.id ? saved : item).sort((a,b) => a.name.localeCompare(b.name,'es')) } : current);
+        onTeamsChanged(saved); if (saved.archivedAt) setIncludeArchivedTeams(true);
+        setNotice(action === 'rename' ? `Nombre actualizado: ${saved.name}.` : action === 'archive' ? `Equipo archivado: ${saved.name}. Su historial se conserva.` : `Equipo restaurado: ${saved.name}.`);
+      }
+      setTeamAction(null);
+    } finally { locked.current = false; setBusy(false); onBusyChange(false); }
+  }
   async function saveReviewer(allowed: boolean) {
     if (locked.current || !reviewerEditor) throw new Error('Espera a que termine la operación.');
     locked.current = true; setBusy(true); onBusyChange(true); setNotice('');
@@ -105,21 +127,26 @@ export function UsersPanel({ repository, onBusyChange, onTeamsChanged }: {
   if (!data) return <ActivityIndicator accessibilityLabel="Cargando usuarios del club" color="#176BA0" />;
   const text = normalizeExerciseSearch(query).trim();
   const users = data.users.filter(user => normalizeExerciseSearch(`${user.name} ${user.email} ${user.teamIds.map(id => data.teams.find(team => team.id === id)?.name ?? '').join(' ')}`).includes(text));
+  const activeTeams = data.teams.filter(team => !team.archivedAt);
   return <View style={s.container}>
     <Text style={s.title}>Usuarios del club</Text><Text style={s.text}>Da de alta entrenadores, cambia sus equipos y activa o desactiva su acceso. Este apartado está reservado a administradores.</Text>
-    <Pressable accessibilityRole="button" style={s.primary} disabled={busy || !data.teams.length} onPress={() => { setError(''); setNotice(''); setForm(true); }}><Text style={s.white}>Añadir entrenador</Text></Pressable>
-    {!data.teams.length && <Text style={s.text}>Crea el primer equipo para poder asignarlo al entrenador.</Text>}
+    <Pressable accessibilityRole="button" style={s.primary} disabled={busy || !activeTeams.length} onPress={() => { setError(''); setNotice(''); setForm(true); }}><Text style={s.white}>Añadir entrenador</Text></Pressable>
+    {!activeTeams.length && <Text style={s.text}>Crea o restaura un equipo para poder asignarlo al entrenador.</Text>}
     <View style={s.controls}><Pressable accessibilityRole="button" style={s.secondary} disabled={busy} onPress={() => { setTeamError(''); setTeamSetupNeeded(false); setTeamEditor({ id: newRecordId(), name: '', category: null }); }}><Text style={s.blue}>Crear equipo</Text></Pressable><Pressable accessibilityRole="button" style={s.secondary} disabled={busy} onPress={refresh}><Text style={s.blue}>Actualizar usuarios</Text></Pressable></View>
     {!!notice && <Text accessibilityLiveRegion="polite" style={s.blue}>{notice}</Text>}{!!error && <Text accessibilityRole="alert" style={s.error}>{error}</Text>}
     {!data.exerciseReviewersReady && <ExerciseReviewsSetup />}
-    <Pressable accessibilityRole="button" accessibilityLabel="Categorías de equipos" aria-expanded={showTeamCategories} disabled={busy} style={s.secondary} onPress={() => setShowTeamCategories(value => !value)}><Text style={s.blue}>Categorías de equipos {showTeamCategories ? '▴' : '▾'}</Text></Pressable>
+    <Pressable accessibilityRole="button" accessibilityLabel="Gestionar equipos" aria-expanded={showTeamCategories} disabled={busy} style={s.secondary} onPress={() => setShowTeamCategories(value => !value)}><Text style={s.blue}>Gestionar equipos {showTeamCategories ? '▴' : '▾'}</Text></Pressable>
     {showTeamCategories && <View style={s.container}>
-      <Text style={s.text}>Asigna una categoría a cada equipo para priorizar sus ejercicios al preparar entrenamientos.</Text>
+      <Text style={s.text}>Cambia nombres y categorías, archiva equipos conservando su historial o elimina los que estén vacíos.</Text>
       {!data.teamCategoriesReady && <TeamCategoriesSetup />}
+      {!data.teamManagementReady && <TeamManagementSetup />}
+      <Pressable accessibilityRole="checkbox" accessibilityLabel="Incluir equipos archivados" aria-checked={includeArchivedTeams} style={s.secondary} disabled={busy} onPress={() => setIncludeArchivedTeams(value => !value)}><Text style={s.blue}>{includeArchivedTeams ? '☑' : '☐'} Incluir equipos archivados</Text></Pressable>
       {!data.teams.length && <Text style={s.text}>Crea un equipo para asignarle su categoría.</Text>}
-      {data.teams.map(team => <View key={team.id} style={s.card} accessibilityLabel={`Categoría de ${team.name}`}>
-        <Text style={s.subtitle}>{team.name}</Text><Text style={s.text}>{team.category ?? 'Sin categoría'}</Text>
+      {data.teams.filter(team => includeArchivedTeams || !team.archivedAt).map(team => <View key={team.id} style={s.card} accessibilityLabel={`Categoría de ${team.name}`}>
+        <Text style={s.subtitle}>{team.name}</Text><Text style={s.text}>{team.category ?? 'Sin categoría'}{team.archivedAt ? ' · Archivado' : ''}</Text>
         <Pressable accessibilityRole="button" accessibilityLabel={`Editar categoría de ${team.name}`} style={s.secondary} disabled={busy || !data.teamCategoriesReady} onPress={() => setCategoryEditor(team)}><Text style={s.blue}>Asignar categoría</Text></Pressable>
+        <View style={s.controls}>{([{ action:'rename',label:'Cambiar nombre' },{ action:team.archivedAt?'restore':'archive',label:team.archivedAt?'Restaurar':'Archivar' },{ action:'delete',label:'Eliminar si está vacío' }] as {action:TeamAction;label:string}[]).map(item => <Pressable key={item.action} accessibilityRole="button" accessibilityLabel={`${item.label} ${team.name}`} disabled={busy || !data.teamManagementReady} style={s.secondary} onPress={() => setTeamAction({team,action:item.action})}><Text style={s.blue}>{item.label}</Text></Pressable>)}</View>
+        {team.archivedAt && <Pressable accessibilityRole="button" accessibilityLabel={`Consultar historial de ${team.name}`} disabled={busy} style={s.secondary} onPress={() => onOpenTeam(team)}><Text style={s.blue}>Consultar historial</Text></Pressable>}
       </View>)}
     </View>}
     <TextInput accessibilityLabel="Buscar usuarios" style={s.input} value={query} onChangeText={setQuery} placeholder="Buscar por nombre, correo o equipo" placeholderTextColor="#718096" />
@@ -134,10 +161,11 @@ export function UsersPanel({ repository, onBusyChange, onTeamsChanged }: {
       {user.role === 'coach' && <Pressable accessibilityRole="button" accessibilityLabel={`Gestionar revisión metodológica de ${user.email}`} disabled={busy || !data.exerciseReviewersReady} style={s.secondary} onPress={() => setReviewerEditor(user)}><Text style={s.blue}>Revisión metodológica</Text></Pressable>}
     </View>)}
     <Pressable accessibilityRole="button" style={s.secondary} disabled={busy} onPress={openGuide}><Text style={s.blue}>Guía de activación de Usuarios</Text></Pressable>
-    {form && <CoachAccountForm teams={data.teams} busy={busy} onCreate={create} onClose={() => setForm(false)} onSetup={openGuide} />}
+    {form && <CoachAccountForm teams={activeTeams} busy={busy} onCreate={create} onClose={() => setForm(false)} onSetup={openGuide} />}
     {accessEditor && <CoachAccessEditor key={accessEditor.id} user={accessEditor} teams={data.teams} busy={busy} onSave={saveAccess} onClose={() => setAccessEditor(null)} />}
     {categoryEditor && <TeamCategoryEditor key={categoryEditor.id} team={categoryEditor} busy={busy} onSave={saveTeamCategory} onClose={() => setCategoryEditor(null)} />}
     {reviewerEditor && <ExerciseReviewerEditor key={reviewerEditor.id} user={reviewerEditor} busy={busy} onSave={saveReviewer} onClose={() => setReviewerEditor(null)} />}
+    {teamAction && <TeamManagementDialog key={`${teamAction.team.id}:${teamAction.action}`} team={teamAction.team} action={teamAction.action} busy={busy} onSave={manageTeam} onClose={() => setTeamAction(null)} />}
     {teamEditor && <Modal visible transparent animationType="fade" onRequestClose={() => { if (!busy) setTeamEditor(null); }}><View style={s.overlay}><View style={s.modal}><ScrollView contentContainerStyle={s.modalContent} keyboardShouldPersistTaps="handled">
       <Text style={s.title}>Crear equipo</Text><Text style={s.label}>Nombre del equipo</Text><TextInput accessibilityLabel="Nombre del nuevo equipo" style={s.input} value={teamEditor.name} onChangeText={name => setTeamEditor({ ...teamEditor, name })} editable={!busy} maxLength={80} />
       {data.teamCategoriesReady && <TeamCategoryPicker value={teamEditor.category ?? null} onChange={category => setTeamEditor({ ...teamEditor, category })} disabled={busy} />}

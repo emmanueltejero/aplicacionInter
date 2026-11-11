@@ -3,10 +3,11 @@ import { Linking, Modal, Pressable, ScrollView, Text, View } from 'react-native'
 import type { ClubUser, CoachAccessUpdate } from '../clubUsers';
 import { validateCoachAccess } from '../clubUsers';
 import { trainingStyles as s } from './trainingStyles';
+import type { Team } from '../teams';
 
 const sqlUrl = 'https://github.com/emmanueltejero/aplicacionInter/blob/main/supabase/migrations/202611100005_coach_access.sql';
 export function CoachAccessEditor({ user, teams, busy, onSave, onClose }: {
-  user: ClubUser; teams: { id: string; name: string }[]; busy: boolean;
+  user: ClubUser; teams: Team[]; busy: boolean;
   onSave: (request: CoachAccessUpdate) => Promise<void>; onClose: () => void;
 }) {
   const [enabled, setEnabled] = useState(user.enabled);
@@ -25,7 +26,7 @@ export function CoachAccessEditor({ user, teams, busy, onSave, onClose }: {
     <Text style={enabled ? s.text : s.warningText}>{enabled ? 'El entrenador podrá acceder a sus equipos y a la biblioteca compartida.' : 'Al guardar, el entrenador perderá el acceso a los datos del club. Su cuenta e historial se conservan y podrás reactivarlo.'}</Text>
     <Text style={s.subtitle}>Equipos asignados</Text>
     {!teams.length && <Text style={s.text}>Todavía no hay equipos creados.</Text>}
-    {teams.map(team => <Pressable key={team.id} accessibilityRole="checkbox" accessibilityLabel={`Equipo asignado ${team.name}`} aria-checked={teamIds.includes(team.id)} disabled={busy} style={s.secondary} onPress={() => setTeamIds(current => current.includes(team.id) ? current.filter(id => id !== team.id) : [...current, team.id])}><Text style={s.blue}>{teamIds.includes(team.id) ? '☑' : '☐'} {team.name}</Text></Pressable>)}
+    {teams.map(team => <Pressable key={team.id} accessibilityRole="checkbox" accessibilityLabel={`Equipo asignado ${team.name}`} aria-checked={teamIds.includes(team.id)} disabled={busy || !!team.archivedAt} style={s.secondary} onPress={() => setTeamIds(current => current.includes(team.id) ? current.filter(id => id !== team.id) : [...current, team.id])}><Text style={s.blue}>{teamIds.includes(team.id) ? '☑' : '☐'} {team.name}{team.archivedAt ? ' · Archivado (consulta)' : ''}</Text></Pressable>)}
     {!teamIds.length && <Text style={s.warningText}>Sin equipos asignados: si el acceso está activado, solo podrá utilizar la biblioteca compartida.</Text>}
     <Text style={s.small}>Los cambios se aplican al guardar. El entrenador verá sus equipos actualizados al recargar la aplicación.</Text>
     {!!error && <Text accessibilityRole="alert" style={s.error}>{error}</Text>}

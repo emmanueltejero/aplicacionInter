@@ -61,6 +61,7 @@ export const demoTrainingRepository: TrainingRepository = {
   },
 };
 function check(error: { code?: string } | null) {
+  if (error?.code === '55000') throw new Error('El equipo está archivado. Un administrador debe restaurarlo para modificar sus datos.');
   if (error && ['PGRST205', 'PGRST202', '42P01', '42883'].includes(error.code ?? '')) throw new TrainingSetupRequired();
   if (error?.code === '40001') throw new Error('El entrenamiento ha cambiado. Cierra el editor y actualiza los entrenamientos antes de editarlo.');
   if (error?.code === 'P0002') throw new Error('Una ficha ha cambiado. Actualiza la biblioteca y quita y vuelve a añadir ese ejercicio.');

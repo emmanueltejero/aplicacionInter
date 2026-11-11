@@ -11,8 +11,8 @@ import { calendarDate, calendarMonth, moveCalendarMonth, teamCalendarEvents } fr
 import { AttendanceDateSearch } from './AttendanceDateSearch';
 import { trainingStyles as s } from './trainingStyles';
 
-export function TeamCalendar({ teamId, date, register, matchesRepository, trainingRepository, onDateChange, onAttendance, onTraining, onMatch }: {
-  teamId: string; date: string; register: Register; matchesRepository: MatchesRepository; trainingRepository: TrainingRepository;
+export function TeamCalendar({ teamId, date, register, matchesRepository, trainingRepository, onDateChange, onAttendance, onTraining, onMatch, readOnly = false }: {
+  readOnly?: boolean; teamId: string; date: string; register: Register; matchesRepository: MatchesRepository; trainingRepository: TrainingRepository;
   onDateChange: (date: string) => void; onAttendance: () => void; onTraining: (id?: string) => void; onMatch: (id?: string) => void;
 }) {
   const [data, setData] = useState<{ plans: TrainingPlan[]; matches: Match[]; plansError: string; matchesError: string } | null>(null);
@@ -59,7 +59,7 @@ export function TeamCalendar({ teamId, date, register, matchesRepository, traini
     <View style={s.card}>
       <Text style={s.subtitle}>{selected.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</Text>
       <Text style={s.small}>{date}</Text>
-      <Pressable accessibilityRole="button" style={s.primary} onPress={onAttendance}><Text style={s.white}>Pasar lista de este día</Text></Pressable>
+      <Pressable accessibilityRole="button" style={s.primary} onPress={onAttendance}><Text style={s.white}>{readOnly ? 'Ver asistencia de este día' : 'Pasar lista de este día'}</Text></Pressable>
       <Text style={s.text}>{marks.length ? `Asistencia: ${marks.filter(value => value === 'present').length} presentes · ${marks.filter(value => value === 'absent').length} ausentes · ${marks.filter(value => value === 'excused').length} justificados` : 'Sin asistencia registrada. Preparar un plan no marca la asistencia.'}</Text>
     </View>
     {!data && <ActivityIndicator accessibilityLabel="Cargando calendario" color="#176BA0" />}
@@ -76,8 +76,8 @@ export function TeamCalendar({ teamId, date, register, matchesRepository, traini
       <Pressable accessibilityRole="button" accessibilityLabel={`Abrir partido contra ${event.match.opponent}`} style={s.secondary} onPress={() => onMatch(event.match.id)}><Text style={s.blue}>Convocatoria y minutos</Text></Pressable>
     </View>)}
     <View style={s.controls}>
-      <Pressable accessibilityRole="button" style={s.secondary} onPress={() => onTraining()}><Text style={s.blue}>Preparar entrenamiento este día</Text></Pressable>
-      <Pressable accessibilityRole="button" style={s.secondary} onPress={() => onMatch()}><Text style={s.blue}>Añadir partido este día</Text></Pressable>
+      <Pressable accessibilityRole="button" style={s.secondary} disabled={readOnly} onPress={() => onTraining()}><Text style={s.blue}>Preparar entrenamiento este día</Text></Pressable>
+      <Pressable accessibilityRole="button" style={s.secondary} disabled={readOnly} onPress={() => onMatch()}><Text style={s.blue}>Añadir partido este día</Text></Pressable>
     </View>
     <Text style={s.small}>Los entrenamientos archivados se consultan en Entrenar. Aquí se muestran los planes activos y todos los partidos del equipo.</Text>
   </View>;

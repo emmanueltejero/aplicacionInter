@@ -20,6 +20,7 @@ export const demoMatchesRepository: MatchesRepository = {
   },
 };
 function check(error: { code?: string } | null) {
+  if (error?.code === '55000') throw new Error('El equipo está archivado. Un administrador debe restaurarlo para modificar sus datos.');
   if (error && ['PGRST205', 'PGRST202', '42P01', '42883'].includes(error.code ?? '')) throw new MatchesSetupRequired();
   if (error?.code === '22023') throw new Error('Revisa la fecha, duración y minutos de los jugadores.');
   if (error) throw new Error('No se pudo guardar o consultar el partido. Revisa la conexión y tus permisos.');

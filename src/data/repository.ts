@@ -86,6 +86,7 @@ type RemotePlayer = { id: string; name: string; number: number; archived_at: str
 const playerColumns = 'id,name,number,archived_at';
 const fromRemote = (player: RemotePlayer): Player => ({ id: player.id, name: player.name, number: player.number, archivedAt: player.archived_at });
 function check(error: { code?: string } | null) {
+  if (error?.code === '55000') throw new Error('El equipo está archivado. Un administrador debe restaurarlo para modificar sus datos.');
   if (error?.code === '23505') throw new Error('Ese dorsal ya está asignado a un jugador activo.');
   if (error) throw new Error('No se pudo guardar o consultar el equipo. Revisa la conexión y tus permisos.');
 }

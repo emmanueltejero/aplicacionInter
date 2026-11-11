@@ -16,8 +16,8 @@ import { TrainingCopyDialog } from './TrainingCopyDialog';
 import { trainingStyles as s } from './trainingStyles';
 
 const setupUrl = 'https://github.com/emmanueltejero/aplicacionInter/blob/main/supabase/migrations/202611100002_training_plans.sql';
-export function TrainingPlansPanel({ teamId, teamName, teamCategory, initialPlayers, repository, exercisesRepository, onBusyChange }: {
-  teamId: string; teamName: string; teamCategory?: ExerciseTeamCategory | null; initialPlayers: number; repository: TrainingRepository; exercisesRepository: ExercisesRepository; onBusyChange: (busy: boolean) => void;
+export function TrainingPlansPanel({ teamId, teamName, teamCategory, initialPlayers, repository, exercisesRepository, onBusyChange, readOnly = false }: {
+  readOnly?: boolean; teamId: string; teamName: string; teamCategory?: ExerciseTeamCategory | null; initialPlayers: number; repository: TrainingRepository; exercisesRepository: ExercisesRepository; onBusyChange: (busy: boolean) => void;
 }) {
   const { training_id, create_training, calendar_date } = useLocalSearchParams<{ training_id?: string; create_training?: string; calendar_date?: string }>();
   const initialDate = calendarDate(calendar_date);
@@ -29,7 +29,7 @@ export function TrainingPlansPanel({ teamId, teamName, teamCategory, initialPlay
   const locked = useRef(false);
   const [editorState, setEditor] = useState<{ plan?: TrainingPlan } | null>(null);
   const [detailState, setDetail] = useState<TrainingPlan | null>(null);
-  const editor: { plan?: TrainingPlan } | null = editorState ?? (create_training === '1' ? {} : null);
+  const editor: { plan?: TrainingPlan } | null = readOnly ? null : editorState ?? (create_training === '1' ? {} : null);
   const detail = detailState ?? plans?.find(item => item.id === training_id) ?? null;
   const [copySource, setCopySource] = useState<TrainingPlan | null>(null);
   const [notice, setNotice] = useState('');
@@ -43,6 +43,7 @@ export function TrainingPlansPanel({ teamId, teamName, teamCategory, initialPlay
   function closeEditor() { setEditor(null); router.setParams({ create_training: undefined }); }
   function closeDetail() { setDetail(null); router.setParams({ training_id: undefined }); }
   async function save(request: TrainingSave) {
+    if (readOnly) throw new Error('El equipo está archivado. Solo se permite consultar su historial.');
     if (locked.current) throw new Error('Espera a que termine el guardado.');
     locked.current = true; setBusy(true); onBusyChange(true); setError('');
     try {
@@ -53,6 +54,7 @@ export function TrainingPlansPanel({ teamId, teamName, teamCategory, initialPlay
     finally { locked.current = false; setBusy(false); onBusyChange(false); }
   }
   async function copy(request: TrainingCopy) {
+    if (readOnly) throw new Error('El equipo está archivado. Solo se permite consultar su historial.');
     if (locked.current) throw new Error('Espera a que termine la operación.');
     locked.current = true; setBusy(true); onBusyChange(true); setError(''); setNotice('');
     try {
@@ -92,7 +94,7 @@ export function TrainingPlansPanel({ teamId, teamName, teamCategory, initialPlay
   return <View style={s.container}>
     <Text style={s.title}>Entrenamientos del equipo</Text>
     <Text style={s.text}>Prepara el plan del día con ejercicios de la biblioteca compartida. Los entrenadores de este equipo y los administradores pueden consultarlo y editarlo.</Text>
-    <Pressable accessibilityRole="button" style={s.primary} disabled={busy} onPress={() => { setError(''); setEditor({}); }}><Text style={s.white}>Crear entrenamiento</Text></Pressable>
+    <Pressable accessibilityRole="button" style={s.primary} disabled={busy || readOnly} onPress={() => { setError(''); setEditor({}); }}><Text style={s.white}>Crear entrenamiento</Text></Pressable>
     <View style={s.controls}><Pressable accessibilityRole="button" style={s.secondary} onPress={() => setFilters({ ...filters, from: dateKey(new Date()), to: dateKey(new Date()) })}><Text style={s.blue}>Hoy</Text></Pressable><Pressable accessibilityRole="button" style={s.secondary} onPress={() => setFilters({ ...filters, from: dateKey(new Date()), to: '' })}><Text style={s.blue}>Próximos</Text></Pressable><Pressable accessibilityRole="button" style={s.secondary} onPress={() => setFilters({ ...filters, from: '', to: '' })}><Text style={s.blue}>Todos</Text></Pressable></View>
     <View style={s.fields}><View style={s.field}><Text style={s.label}>Desde</Text><TextInput accessibilityLabel="Entrenamientos desde" style={s.input} value={filters.from} onChangeText={value => setFilters({ ...filters, from: formatDateInput(value) })} placeholder="AAAA-MM-DD" keyboardType="number-pad" maxLength={10} /></View><View style={s.field}><Text style={s.label}>Hasta</Text><TextInput accessibilityLabel="Entrenamientos hasta" style={s.input} value={filters.to} onChangeText={value => setFilters({ ...filters, to: formatDateInput(value) })} placeholder="AAAA-MM-DD" keyboardType="number-pad" maxLength={10} /></View></View>
     <Pressable accessibilityRole="checkbox" accessibilityLabel="Incluir entrenamientos archivados" accessibilityState={{ checked: filters.includeArchived }} style={s.secondary} onPress={() => setFilters({ ...filters, includeArchived: !filters.includeArchived })}><Text style={s.blue}>{filters.includeArchived ? '☑' : '☐'} Incluir archivados</Text></Pressable>
@@ -108,8 +110,8 @@ export function TrainingPlansPanel({ teamId, teamName, teamCategory, initialPlay
           <Text style={s.subtitle}>{plan.title}</Text><Text style={s.blue}>{plan.date}{plan.archivedAt ? ' · Archivado' : ''}</Text>
           <Text style={s.text}>{totals.minutes} min · {plan.entries.length} {plan.entries.length === 1 ? 'ejercicio' : 'ejercicios'} · {plan.playerCount} jugadores previstos</Text><Text style={s.small}>Espacio común: {totals.spaceLength} × {totals.spaceWidth} m</Text>
           {!!totals.mismatches.length && <Text style={s.warningText}>Revisa los grupos de {totals.mismatches.length} {totals.mismatches.length === 1 ? 'ejercicio' : 'ejercicios'}.</Text>}
-          <View style={s.controls}><Pressable accessibilityRole="button" accessibilityLabel={`Ver plan ${plan.title}`} style={s.secondary} disabled={busy} onPress={() => setDetail(plan)}><Text style={s.blue}>Ver plan</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel={`Editar entrenamiento ${plan.title}`} style={s.secondary} disabled={busy} onPress={() => { setError(''); setEditor({ plan }); }}><Text style={s.blue}>Editar</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel={`${plan.archivedAt ? 'Restaurar' : 'Archivar'} entrenamiento ${plan.title}`} style={s.secondary} disabled={busy} onPress={() => { void save({ ...plan, archived: !plan.archivedAt }).catch(() => {}); }}><Text style={s.blue}>{plan.archivedAt ? 'Restaurar' : 'Archivar'}</Text></Pressable></View>
-          <Pressable accessibilityRole="button" accessibilityLabel={`Duplicar entrenamiento ${plan.title}`} style={s.secondary} disabled={busy} onPress={() => { setError(''); setNotice(''); setCopySource(plan); }}><Text style={s.blue}>Duplicar para otra fecha</Text></Pressable>
+          <View style={s.controls}><Pressable accessibilityRole="button" accessibilityLabel={`Ver plan ${plan.title}`} style={s.secondary} disabled={busy} onPress={() => setDetail(plan)}><Text style={s.blue}>Ver plan</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel={`Editar entrenamiento ${plan.title}`} style={s.secondary} disabled={busy || readOnly} onPress={() => { setError(''); setEditor({ plan }); }}><Text style={s.blue}>Editar</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel={`${plan.archivedAt ? 'Restaurar' : 'Archivar'} entrenamiento ${plan.title}`} style={s.secondary} disabled={busy || readOnly} onPress={() => { void save({ ...plan, archived: !plan.archivedAt }).catch(() => {}); }}><Text style={s.blue}>{plan.archivedAt ? 'Restaurar' : 'Archivar'}</Text></Pressable></View>
+          <Pressable accessibilityRole="button" accessibilityLabel={`Duplicar entrenamiento ${plan.title}`} style={s.secondary} disabled={busy || readOnly} onPress={() => { setError(''); setNotice(''); setCopySource(plan); }}><Text style={s.blue}>Duplicar para otra fecha</Text></Pressable>
           {exportButtons(plan)}
         </View>;
       })}

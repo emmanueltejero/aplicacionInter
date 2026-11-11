@@ -11,7 +11,7 @@ import { MatchEditor } from './MatchEditor';
 import { calendarDate } from '../teamCalendar';
 
 const setupUrl = 'https://github.com/emmanueltejero/aplicacionInter/blob/main/supabase/migrations/202611090002_matches.sql';
-export function MatchesPanel({ teamId, roster, repository, onBusyChange }: { teamId: string; roster: Player[]; repository: MatchesRepository; onBusyChange?: (busy: boolean) => void }) {
+export function MatchesPanel({ teamId, roster, repository, onBusyChange, readOnly = false }: { readOnly?: boolean; teamId: string; roster: Player[]; repository: MatchesRepository; onBusyChange?: (busy: boolean) => void }) {
   const { match_view, match_id, create_match, calendar_date } = useLocalSearchParams<{ match_view?: string; match_id?: string; create_match?: string; calendar_date?: string }>();
   const initialDate = calendarDate(calendar_date);
   const totalsView = match_view === 'totals';
@@ -23,7 +23,7 @@ export function MatchesPanel({ teamId, roster, repository, onBusyChange }: { tea
   const locked = useRef(false);
   const [editorState, setEditor] = useState<{ match?: Match } | null>(null);
   const linkedMatch = matches?.find(item => item.id === match_id);
-  const editor = editorState ?? (linkedMatch ? { match: linkedMatch } : create_match === '1' ? {} : null);
+  const editor = editorState ?? (linkedMatch ? { match: linkedMatch } : create_match === '1' && !readOnly ? {} : null);
   const [filters, setFilters] = useState(() => initialReportFilters());
   useEffect(() => {
     let active = true;
@@ -33,6 +33,7 @@ export function MatchesPanel({ teamId, roster, repository, onBusyChange }: { tea
   }, [teamId, repository, attempt]);
   function closeEditor() { setEditor(null); router.setParams({ match_id: undefined, create_match: undefined }); }
   async function save(match: Match) {
+    if (readOnly) throw new Error('El equipo está archivado. Solo se permite consultar su historial.');
     if (locked.current) throw new Error('Espera a que termine el guardado.');
     locked.current = true; setBusy(true); onBusyChange?.(true); setSaveError('');
     try {
@@ -67,15 +68,15 @@ export function MatchesPanel({ teamId, roster, repository, onBusyChange }: { tea
       {!!totals.error && <Text accessibilityRole="alert" style={s.error}>{totals.error}</Text>}
       {totals.data && <><Text style={s.text}>{totals.data.matches} partidos disputados en el período</Text>{totals.data.rows.map(row => <View key={row.player.id} style={s.card} accessibilityLabel={`Minutos de ${row.player.name}`}><View style={s.heading}><Text style={s.name}>#{row.player.number} {row.player.name}</Text><Text style={s.minutes}>{row.called === 0 ? 'Sin datos' : row.called === row.pending ? 'Pendiente' : `${row.minutes} min`}</Text></View>{!!row.player.archivedAt && <Text style={s.small}>Archivado · historial conservado</Text>}<Text style={s.text}>Convocado: {row.called} · Jugó: {row.played} · Pendientes: {row.pending}</Text></View>)}</>}
     </> : <>
-      <Pressable accessibilityRole="button" style={s.primary} disabled={busy} onPress={() => setEditor({})}><Text style={s.white}>Crear partido</Text></Pressable>
+      <Pressable accessibilityRole="button" style={s.primary} disabled={busy || readOnly} onPress={() => setEditor({})}><Text style={s.white}>Crear partido</Text></Pressable>
       {matches.length === 0 && <Text style={s.text}>Todavía no hay partidos. Crea el primero y prepara su convocatoria.</Text>}
       {[...matches].sort((a, b) => b.date.localeCompare(a.date)).map(match => <View key={match.id} style={s.card}>
         <Text style={s.name}>Inter Playa Honda · {match.opponent}</Text><Text style={s.text}>{match.date} · {match.venue === 'home' ? 'Local' : 'Visitante'} · {match.duration} min</Text>
         <Text style={s.small}>{match.played ? 'Disputado' : 'Pendiente de disputar'} · {match.players.length} convocados{match.played ? ` · ${match.players.filter(entry => entry.minutes === null).length} con minutos pendientes` : ''}</Text>
-        <Pressable accessibilityRole="button" accessibilityLabel={`Editar partido contra ${match.opponent}`} style={s.secondary} disabled={busy} onPress={() => setEditor({ match })}><Text style={s.blue}>Convocatoria y minutos</Text></Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel={`${readOnly ? 'Consultar' : 'Editar'} partido contra ${match.opponent}`} style={s.secondary} disabled={busy} onPress={() => setEditor({ match })}><Text style={s.blue}>Convocatoria y minutos</Text></Pressable>
       </View>)}
     </>}
-    {editor && <MatchEditor match={editor.match} initialDate={initialDate ? dateKey(initialDate) : undefined} roster={roster} busy={busy} onSave={save} onClose={closeEditor} />}
+    {editor && <MatchEditor readOnly={readOnly} match={editor.match} initialDate={initialDate ? dateKey(initialDate) : undefined} roster={roster} busy={busy} onSave={save} onClose={closeEditor} />}
   </View>;
 }
 const s = StyleSheet.create({ container: { gap: 12 }, title: { color: '#17212D', fontSize: 21, fontWeight: '700' }, controls: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 }, field: { flex: 1, minWidth: 100, gap: 4 }, input: { minHeight: 48, borderWidth: 1, borderColor: '#DAE2EB', borderRadius: 8, padding: 10, backgroundColor: '#FFF', color: '#17212D', fontSize: 14 }, primary: { minHeight: 48, borderRadius: 8, backgroundColor: '#176BA0', alignItems: 'center', justifyContent: 'center', padding: 12 }, white: { color: '#FFF', fontWeight: '700' }, secondary: { minHeight: 44, padding: 10, borderWidth: 1, borderColor: '#DAE2EB', backgroundColor: '#FFF', borderRadius: 8, justifyContent: 'center', alignItems: 'center' }, blue: { color: '#176BA0', fontWeight: '600', fontSize: 13 }, text: { color: '#5D6D7E', fontSize: 13, lineHeight: 21 }, small: { color: '#718096', fontSize: 11, lineHeight: 18 }, card: { borderWidth: 1, borderColor: '#DFE5EC', backgroundColor: '#FFF', borderRadius: 14, padding: 16, gap: 8 }, name: { flex: 1, color: '#17212D', fontSize: 16, fontWeight: '600' }, heading: { flexDirection: 'row', gap: 10, alignItems: 'center' }, minutes: { color: '#176BA0', fontSize: 19, fontWeight: '700' }, error: { color: '#A52D38', fontSize: 13, lineHeight: 20 } });

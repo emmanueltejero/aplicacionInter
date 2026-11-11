@@ -194,13 +194,25 @@ Requiere [202611100006_exercise_team_categories.sql](supabase/migrations/2026111
 
 ## Categoría de cada equipo y recomendaciones al entrenar
 
-Un administrador puede abrir **Menú → Usuarios del club → Categorías de equipos** y asignar a cada equipo una de las categorías del club, por ejemplo **Alevín** al **Alevín B**. También puede elegirla al crear un equipo o dejarlo **Sin categoría**. La asignación se guarda en `teams.category`, no se deduce del nombre. Los equipos existentes empiezan sin categoría y conservan nombres, entrenadores, plantillas e historial.
+Un administrador puede abrir **Menú → Usuarios del club → Gestionar equipos** y asignar a cada equipo una de las categorías del club, por ejemplo **Alevín** al **Alevín B**. También puede elegirla al crear un equipo o dejarlo **Sin categoría**. La asignación se guarda en `teams.category`, no se deduce del nombre. Los equipos existentes empiezan sin categoría y conservan nombres, entrenadores, plantillas e historial.
 
 En **Entrenar → Crear/Editar entrenamiento → Añadir ejercicios de la biblioteca**, los ejercicios etiquetados para la categoría del equipo aparecen primero, con **Recomendado para Alevín**, por ejemplo. Los demás ejercicios siguen disponibles; dentro de cada grupo se conserva el orden alfabético. Los filtros de búsqueda, favoritos, contenido y categoría siguen delimitando la selección. Un ejercicio sin clasificar no se considera recomendado y los archivados siguen excluidos de las nuevas incorporaciones. Cambiar la categoría del equipo o el orden sugerido no altera los bloques de una sesión ni sus copias o PDF.
 
 Para activarlo ejecuta [202611110003_team_categories.sql](supabase/migrations/202611110003_team_categories.sql) en Supabase después del SQL de usuarios. No requiere desplegar otra Edge Function. La ampliación conserva la creación anterior de equipos; las cuentas sin el nuevo SQL pueden seguir usando sus equipos y la biblioteca. Las nuevas APIs validan la categoría, exigen administrador activo y rechazan una edición desactualizada; los reintentos idénticos confirman el resultado sin duplicar equipos ni sobrescribir una categoría posterior.
 
 Se han comprobado orden, combinación de filtros, permisos y conservación de datos con PostgreSQL local y flujos de móvil con respuestas simuladas. Tras activar el SQL, asigna la categoría a los equipos reales y recarga en los otros dispositivos para recoger el cambio.
+
+## Cambiar el nombre, archivar y eliminar equipos vacíos
+
+Los administradores activos disponen de **Menú → Usuarios del club → Gestionar equipos**. Permite **Cambiar nombre**, **Archivar**, **Restaurar** y **Eliminar si está vacío**, además de asignar la categoría. Un cambio de nombre conserva el identificador, entrenadores, jugadores y todo el historial; se muestra en la cabecera y en los documentos que se generen después. Los nombres se normalizan y no pueden coincidir con otro equipo, incluidos los archivados.
+
+Archivar oculta el equipo en las selecciones habituales y conserva sus asignaciones y datos. Se puede encontrar con **Incluir equipos archivados**, restaurarlo o abrir **Consultar historial**. Sus entrenadores también pueden activar **Mostrar equipos archivados** en el selector para consultar sus datos. El historial queda en modo consulta: asistencia, plantilla, partidos, planes y calendario siguen disponibles; se pueden descargar PDF de planes guardados, pero no modificar los datos del equipo. La biblioteca compartida conserva su uso habitual.
+
+La eliminación definitiva exige escribir el nombre exacto y solo admite equipos sin jugadores (incluidos los archivados), asistencias, partidos, convocatorias ni planes. Se eliminan sus asignaciones y se conservan las cuentas de los entrenadores. Si tiene historial, el servidor rechaza la operación y propone archivarlo. No se ha eliminado ningún equipo real al implementar esta función.
+
+Para activarlo ejecuta [202611110005_team_management.sql](supabase/migrations/202611110005_team_management.sql) después de las ampliaciones anteriores y recarga la aplicación. No requiere volver a desplegar `club-users`. La migración conserva los equipos actuales como activos, añade estado de archivo y revisión, mantiene RLS y no concede escrituras directas de equipos. Las nuevas operaciones verifican administrador, estado esperado y dependencias en el servidor; los reintentos idénticos son seguros y los formularios antiguos no sobrescriben metadatos posteriores. Un trigger bloquea inserciones, cambios y borrados del historial archivado, también desde APIs y pestañas antiguas, y nuevas asignaciones a equipos archivados. Restaurar vuelve a permitir trabajar con los mismos datos.
+
+Las copias de seguridad existentes incluyen automáticamente estas columnas y todo el historial. Se han comprobado permisos y conservación con PostgreSQL local y los recorridos móviles con respuestas simuladas, incluidos consulta de partidos, PDF, restauración y limpieza de la selección/asignaciones tras eliminar un equipo vacío.
 
 ## Revisión de ejercicios por dirección metodológica
 
