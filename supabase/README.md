@@ -2,6 +2,8 @@
 
 Esta carpeta prepara la base de datos y sus permisos. La aplicación no contiene claves privadas ni tiene permiso para crear tablas o dar de alta administradores.
 
+Para copias de seguridad de datos, cuentas e imágenes, sigue [BACKUPS.md](BACKUPS.md). El flujo está preparado para el plan Free y necesita secretos de servidor exclusivos de GitHub Actions; no se configuran en la aplicación. Publicar el código no activa las copias ni crea automáticamente la primera.
+
 ## 1. Crear las tablas
 
 En el proyecto nuevo, abre **SQL Editor → New query**, pega `migrations/202611050001_club.sql` y ejecuta una sola vez. La migración se ejecuta dentro de una transacción. Si hay tablas previas con estos nombres, investiga el conflicto; no las borres para forzar su ejecución.

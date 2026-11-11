@@ -42,3 +42,9 @@ yarn-error.*
 
 # Downloadable standalone demo output
 dist-portable/
+
+# Encrypted backup output and local plaintext recovery directories
+/backup-output/
+/backup-restore/
+/backups/
+/supabase/.temp/

@@ -1,0 +1,55 @@
+name: Copias cifradas del club
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '23 3 * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: club-encrypted-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    if: github.event_name == 'workflow_dispatch' || vars.CLUB_BACKUPS_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Descargar código
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Preparar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Instalar Supabase CLI oficial
+        shell: bash
+        run: |
+          npm install --prefix "$RUNNER_TEMP/club-backup-cli" --no-audit --no-fund supabase@3.1.0
+          echo "$RUNNER_TEMP/club-backup-cli/node_modules/.bin" >> "$GITHUB_PATH"
+      - name: Exportar, cifrar y verificar
+        env:
+          CLUB_DB_URL: ${{ secrets.CLUB_DB_URL }}
+          CLUB_DB_PASSWORD: ${{ secrets.CLUB_DB_PASSWORD }}
+          CLUB_SUPABASE_KEY: ${{ secrets.CLUB_SUPABASE_KEY }}
+          CLUB_BACKUP_PASSWORD: ${{ secrets.CLUB_BACKUP_PASSWORD }}
+        run: node scripts/backup/create.mjs
+      - name: Guardar solo la copia cifrada durante 30 días
+        uses: actions/upload-artifact@v4
+        with:
+          name: inter-club-backup-${{ github.run_id }}
+          path: backup-output/*.tar.gz.enc
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
+      - name: Indicar resultado
+        run: echo 'Copia cifrada completada y verificada. Descárgala desde Artifacts y conserva una copia fuera de GitHub. El ensayo de restauración en un proyecto nuevo se realiza por separado.' >> "$GITHUB_STEP_SUMMARY"
+      - name: Limpiar temporales privados
+        if: always()
+        shell: bash
+        run: |
+          rm -rf /tmp/inter-club-backup-*

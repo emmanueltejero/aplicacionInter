@@ -16,6 +16,8 @@ La integración remota requiere configurar la URL, la clave pública y el esquem
 
 ## Desarrollo
 
+Las copias de seguridad se preparan por separado de la publicación web. [La guía de copias cifradas](supabase/BACKUPS.md) explica los secretos de GitHub, la primera ejecución, su descarga, la programación diaria y el ensayo de recuperación. Incluyen base de datos, cuentas de Auth, imágenes actuales e históricas, permisos y código; no están activadas hasta configurar los secretos y `CLUB_BACKUPS_ENABLED`. El repositorio público solo recibe artifacts cifrados, con conservación de 30 días. Los datos en claro y credenciales no se incorporan al código ni a GitHub Pages.
+
 Node.js 24 LTS y npm. Desde `/workspace/aplicacionInter`:
 
 ```sh
