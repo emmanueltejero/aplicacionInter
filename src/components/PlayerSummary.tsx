@@ -5,8 +5,8 @@ import type { ReportFilters } from '../attendanceReport';
 import type { MatchesRepository } from '../data/matchesRepository';
 import { AttendanceReport } from './AttendanceReport';
 
-export function PlayerSummary({ teamId, roster, register, filters, onChange, repository }: {
-  teamId: string; roster: Player[]; register: Register; filters: ReportFilters;
+export function PlayerSummary({ teamId, teamName, roster, register, filters, onChange, repository }: {
+  teamId: string; teamName: string; roster: Player[]; register: Register; filters: ReportFilters;
   onChange: (filters: ReportFilters) => void; repository: MatchesRepository;
 }) {
   const [matches, setMatches] = useState<Match[] | null>(null);
@@ -18,6 +18,6 @@ export function PlayerSummary({ teamId, roster, register, filters, onChange, rep
       .catch(cause => { if (active) setError(cause instanceof Error ? cause.message : 'No se pudieron cargar los partidos.'); });
     return () => { active = false; };
   }, [teamId, repository, attempt]);
-  return <AttendanceReport roster={roster} register={register} filters={filters} onChange={onChange}
+  return <AttendanceReport teamName={teamName} roster={roster} register={register} filters={filters} onChange={onChange}
     matches={matches} matchesError={error} onRetryMatches={() => { setMatches(null); setError(''); setAttempt(value => value + 1); }} />;
 }

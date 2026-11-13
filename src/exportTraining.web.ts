@@ -1,23 +1,12 @@
-import { Asset } from 'expo-asset';
 import type { TrainingPlan } from './trainingPlans';
 import { createTrainingPdf } from './trainingPdf';
 import { trainingPdfFilename, trainingPrintHtml } from './trainingDocument';
 import { clubCrestData } from './clubCrestData';
 import { trainingImages } from './data/exerciseImages';
+import { loadPdfAssets } from './pdfAssets';
 
-let fonts: Promise<{ font: string; boldFont: string }> | undefined;
-async function fontBase64(module: number | string) {
-  const response = await fetch(Asset.fromModule(module).uri);
-  if (!response.ok) throw new Error('No se pudo cargar la tipografía del PDF. Revisa la conexión e inténtalo de nuevo.');
-  const bytes = new Uint8Array(await response.arrayBuffer());
-  let binary = '';
-  for (let start = 0; start < bytes.length; start += 8192) binary += String.fromCharCode(...bytes.subarray(start, start + 8192));
-  return btoa(binary);
-}
 export async function saveTrainingPdf(plan: TrainingPlan, teamName: string): Promise<void> {
-  fonts ??= Promise.all([fontBase64(require('../assets/fonts/DejaVuSans.ttf')), fontBase64(require('../assets/fonts/DejaVuSans-Bold.ttf'))])
-    .then(([font, boldFont]) => ({ font, boldFont })).catch(error => { fonts = undefined; throw error; });
-  const pdf = createTrainingPdf(plan, teamName, { ...await fonts, crest: clubCrestData, images: await trainingImages(plan) });
+  const pdf = createTrainingPdf(plan, teamName, { ...await loadPdfAssets(), images: await trainingImages(plan) });
   const url = URL.createObjectURL(pdf.output('blob')), anchor = document.createElement('a');
   anchor.href = url; anchor.download = trainingPdfFilename(plan); document.body.appendChild(anchor); anchor.click(); anchor.remove();
   setTimeout(() => URL.revokeObjectURL(url), 60000);

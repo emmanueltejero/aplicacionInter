@@ -111,6 +111,12 @@ Cada ficha de Resumen reúne ahora la asistencia a entrenamientos y los partidos
 
 Los partidos se vuelven a cargar al entrar en Resumen, por lo que las ediciones de la pestaña Partidos aparecen al regresar. Si la carga falla, se conserva la asistencia visible y se ofrece reintentar los partidos, sin mostrar estadísticas de partidos ficticiamente a cero. Esta mejora utiliza las tablas ya activadas y no requiere otra migración.
 
+### PDF e impresión del resumen
+
+En **Resumen**, **Ver PDF**, **Guardar PDF** e **Imprimir** preparan el listado del equipo con los filtros actuales. Incluye el escudo, el equipo, el período y la fecha de corte, los jugadores (incluidos los archivados si se seleccionan), registros/asistencias/ausencias/justificadas/porcentaje, partidos jugados, minutos totales, media y partidos con minutos pendientes. El documento A4 horizontal repite las cabeceras y pagina las listas largas, manteniendo los mismos cálculos y exclusiones que la pantalla. Los pendientes y «Sin datos» conservan su significado, sin inventar ceros.
+
+El visor web se abre en otra pestaña; si el navegador lo bloquea, se descarga el archivo. En el móvil también puede abrirse o imprimirse desde Descargas. La impresión tiene su propio documento y no imprime la navegación de la aplicación. En Android/iOS nativos se usa el menú de compartir o impresión. La exportación se bloquea mientras se cargan los partidos, ante errores de carga o fechas inválidas. Los documentos se generan en el dispositivo con los datos ya autorizados, sin guardarlos en Supabase ni requerir SQL nuevo.
+
 ## Corregir y buscar asistencia a entrenamientos
 
 En **Pasar lista**, **Buscar asistencia por fecha** abre un calendario desplegable: elige día, mes y año y pulsa **Usar fecha** para consultar directamente ese día. Se conservan las flechas y el acceso a hoy. La consulta no crea registros. **Quitar marca** devuelve al jugador a **Sin marcar**, actualiza los contadores y lo excluye del cálculo del porcentaje de ese día; las demás fechas y jugadores se conservan. Las marcas de jugadores archivados se mantienen hasta restaurar al jugador.

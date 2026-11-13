@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import type { Player, Register } from '../domain';
 import { dateKey, formatDateInput, initialReportFilters } from '../domain';
@@ -6,17 +6,34 @@ import { attendanceReport } from '../attendanceReport';
 import type { ReportFilters } from '../attendanceReport';
 import type { Match } from '../matches';
 import { matchTotals } from '../matches';
+import { summaryDocument } from '../summaryDocument';
+import { exportSummary } from '../exportSummary';
+import type { SummaryExportMode } from '../exportSummary';
 
-export function AttendanceReport({ roster, register, filters, onChange, matches, matchesError, onRetryMatches }: {
-  roster: Player[]; register: Register; filters: ReportFilters; onChange: (filters: ReportFilters) => void;
+export function AttendanceReport({ teamName, roster, register, filters, onChange, matches, matchesError, onRetryMatches }: {
+  teamName: string; roster: Player[]; register: Register; filters: ReportFilters; onChange: (filters: ReportFilters) => void;
   matches: Match[] | null; matchesError: string; onRetryMatches: () => void;
 }) {
+  const [exporting, setExporting] = useState(false);
+  const [exportNotice, setExportNotice] = useState('');
+  const [exportError, setExportError] = useState('');
+  const exportLock = useRef(false);
   const today = dateKey(new Date());
   const result = useMemo(() => {
     try { return { report: attendanceReport(roster, register, filters, today), games: matches === null ? null : matchTotals(roster.filter(player => filters.includeArchived || !player.archivedAt), matches, filters.from, filters.to, today), error: '' }; }
     catch (cause) { return { report: null, games: null, error: cause instanceof Error ? cause.message : 'Revisa las fechas.' }; }
   }, [roster, register, filters, today, matches]);
   const report = result.report;
+  const canExport = !!report && matches !== null && !matchesError;
+  async function prepareDocument(mode: SummaryExportMode) {
+    if (exportLock.current || !canExport || matches === null) return;
+    exportLock.current = true; setExporting(true); setExportNotice(''); setExportError('');
+    try {
+      const document = summaryDocument(teamName, roster, register, filters, matches, today);
+      setExportNotice(await exportSummary(document, mode));
+    } catch { setExportError('No se pudo preparar el resumen. Revisa la conexión y vuelve a intentarlo. Si falla la impresión o el visor, prueba Guardar PDF.'); }
+    finally { exportLock.current = false; setExporting(false); }
+  }
   function choosePeriod(period: 'month' | 'last30' | 'all') {
     const now = new Date();
     const previous = new Date(now); previous.setDate(previous.getDate() - 29);
@@ -32,6 +49,11 @@ export function AttendanceReport({ roster, register, filters, onChange, matches,
       <View style={s.field}><Text style={s.label}>Hasta</Text><TextInput accessibilityLabel="Resumen hasta" style={s.input} value={filters.to} onChangeText={value => onChange({ ...filters, to: formatDateInput(value) })} placeholder="AAAA-MM-DD" placeholderTextColor="#718096" keyboardType="number-pad" maxLength={10} /></View>
     </View>
     <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: filters.includeArchived }} style={s.checkbox} onPress={() => onChange({ ...filters, includeArchived: !filters.includeArchived })}><Text style={s.blue}>{filters.includeArchived ? '☑' : '☐'} Incluir jugadores archivados</Text></Pressable>
+    <View style={s.shortcuts}>{([{ value: 'view', label: 'Ver PDF' }, { value: 'save', label: 'Guardar PDF' }, { value: 'print', label: 'Imprimir' }] as const).map(action => <Pressable key={action.value} accessibilityRole="button" accessibilityLabel={`${action.label} del resumen`} disabled={!canExport || exporting} style={[s.shortcut, (!canExport || exporting) && { opacity: .5 }]} onPress={() => { void prepareDocument(action.value); }}><Text style={s.blue}>{action.label}</Text></Pressable>)}</View>
+    <Text style={s.description}>El PDF incluye el listado del equipo con los filtros seleccionados. Puedes guardarlo en el móvil o imprimirlo.</Text>
+    {(!canExport || exporting) && <Text accessibilityLiveRegion="polite" style={s.description}>{exporting ? 'Preparando resumen…' : result.error ? 'Corrige las fechas para preparar el PDF.' : matchesError ? 'Reintenta la carga de partidos antes de preparar el PDF.' : 'Espera a que se carguen los partidos para preparar el PDF.'}</Text>}
+    {!!exportNotice && <Text accessibilityLiveRegion="polite" style={s.description}>{exportNotice}</Text>}
+    {!!exportError && <Text accessibilityRole="alert" style={s.error}>{exportError}</Text>}
     <Text style={s.explanation}>Porcentaje = asistencias ÷ registros completados del jugador. Las ausencias justificadas cuentan como no asistidas. Los días sin marcar y las fechas futuras quedan fuera del cálculo.</Text>
     <Text style={s.explanation}>Media de minutos = minutos registrados ÷ partidos en los que jugó. Las convocatorias con 0 minutos y los registros pendientes no entran en la media.</Text>
     {matches === null && !matchesError && <ActivityIndicator accessibilityLabel="Cargando estadísticas de partidos" color="#176BA0" />}
