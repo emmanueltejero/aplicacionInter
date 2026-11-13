@@ -3,6 +3,7 @@ import { copyFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { preparePwa } from './pwa-assets.mjs';
+import { oauthEntryHtml } from './oauth-entry.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const basePath = process.env.EXPO_BASE_PATH || '/aplicacionInter';
@@ -17,10 +18,10 @@ if (exported.error) throw exported.error;
 if (exported.status !== 0) process.exit(exported.status ?? 1);
 await preparePwa(root, resolve(root, 'dist'), basePath);
 copyFileSync(resolve(root, 'dist/index.html'), resolve(root, 'dist/404.html'));
-// Serve the OAuth consent route with HTTP 200 on GitHub Pages, including a
-// direct visit from Supabase Auth. Expo Router handles the route in the bundle.
+// A static bridge preserves the authorization query and starts the app at its
+// established root entry; no nested Expo Router route is required on first load.
 mkdirSync(resolve(root, 'dist/oauth/consent'), { recursive: true });
-copyFileSync(resolve(root, 'dist/index.html'), resolve(root, 'dist/oauth/consent/index.html'));
+writeFileSync(resolve(root, 'dist/oauth/consent/index.html'), oauthEntryHtml(basePath));
 copyFileSync(resolve(root, 'assets/fonts/LICENSE-DejaVu.txt'), resolve(root, 'dist/LICENSE-DejaVu.txt'));
 writeFileSync(resolve(root, 'dist/.nojekyll'), '');
 console.log(`GitHub Pages export prepared for ${basePath}/. Not uploaded or published.`);

@@ -21,7 +21,7 @@ El permiso vivo se comprueba en cada petición y en RLS: cuenta habilitada, clie
 
 ## 2. Publicar la pantalla y ejecutar la migración
 
-1. Tener publicada la versión de la web que incluye `/aplicacionInter/oauth/consent/` (la publicación habitual de `main` la genera). Comprueba esta URL: `https://emmanueltejero.github.io/aplicacionInter/oauth/consent/`. Sin `authorization_id` debe explicar que falta una solicitud; no debe pedir autorizar a ningún cliente.
+1. Tener publicada la versión de la web que incluye `/aplicacionInter/oauth/consent/` (la publicación habitual de `main` la genera). Ese directorio contiene un puente estático hacia la entrada principal, conservando `authorization_id` y el resto de la query. La raíz muestra el consentimiento cuando recibe esa solicitud; evita depender de una ruta SPA anidada al abrir desde Supabase. Sin `authorization_id`, el enlace abre la aplicación habitual y no pide autorizar a ningún cliente.
 2. En Supabase → **SQL Editor → New query**, ejecutar **todo** `supabase/migrations/202611130001_club_mcp.sql`. Es repetible y conserva el historial. No vuelvas a ejecutar el SQL inicial del club.
 3. No conceder `authenticated` al nuevo rol ni SELECT/EXECUTE adicionales. El rol necesita pertenecer a `authenticator` para que PostgREST lo seleccione; la migración lo prepara.
 
@@ -30,7 +30,7 @@ El permiso vivo se comprueba en cada petición y en RLS: cuenta habilitada, clie
 En Supabase → **Authentication → OAuth Server**:
 
 1. Activar el servidor OAuth 2.1.
-2. **Authorization Path**: `/aplicacionInter/oauth/consent/`. Mantener **Site URL** en `https://emmanueltejero.github.io/aplicacionInter/`. El destino resultante debe ser exactamente `https://emmanueltejero.github.io/aplicacionInter/oauth/consent/?authorization_id=...`. El path incluye el repositorio porque es una URL de GitHub Pages.
+2. **Authorization Path**: `/aplicacionInter/oauth/consent/`. Mantener **Site URL** en `https://emmanueltejero.github.io/aplicacionInter/`. Supabase abre `https://emmanueltejero.github.io/aplicacionInter/oauth/consent/?authorization_id=...` y el puente lleva a `https://emmanueltejero.github.io/aplicacionInter/?authorization_id=...`, donde se muestra el consentimiento. El path incluye el repositorio porque es una URL de GitHub Pages. La corrección del puente no requiere cambiar esa configuración.
 3. Mantener las claves asimétricas de firma (actualmente ES256). Nunca copiar la clave de firma, una Secret key ni `service_role` a ChatGPT.
 4. Activar **Allow Dynamic Client Registration (DCR)**, la vía de conexión automática documentada por Supabase y el ejemplo oficial de OpenAI. Puede registrar clientes nuevos, pero **el registro no da acceso a los datos**: nuestro hook y la lista permitida impiden usar clientes no habilitados.
 5. Una vez desplegada la función (paso 4), crear la app OAuth en ChatGPT (paso 5), sin rellenar Client ID/Secret si la interfaz permite registro automático. ChatGPT registrará su cliente y abrirá nuestra pantalla. Iniciar sesión: la pantalla mostrará que falta habilitar el cliente y su **UUID público**, con el botón de autorizar bloqueado.
