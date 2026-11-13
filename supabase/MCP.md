@@ -1,8 +1,8 @@
 # ChatGPT → Inter Playa Honda: MCP autenticado de solo consulta
 
-Estado: **implementado y probado localmente; falta activar OAuth, aplicar SQL y desplegar la función en el proyecto real**. No se han consultado nombres, asistencia ni minutos reales. La consulta pública del 13/11/2026 encontró JWKS ES256 disponible, discovery OAuth 404 y `club-mcp` 404.
+Estado: **función MCP publicada y OAuth/registro dinámico activos**. Se han verificado HTTP 401 sin sesión y metadatos públicos correctos. Falta completar el cliente autorizado, verificar el hook/SQL y consultar con una cuenta real dentro de ChatGPT. No se han consultado nombres, asistencia ni minutos reales. La comprobación inicial del 13/11/2026 encontró esos servicios sin activar; después se publicaron mediante GitHub Actions y el propietario habilitó OAuth/DCR.
 
-URL prevista, **no operativa hasta completar estos pasos**:
+URL del servidor publicado (requiere autorización antes de consultar datos):
 
 `https://corcjvflavfpvzgyvpyb.supabase.co/functions/v1/club-mcp`
 
@@ -30,7 +30,7 @@ El permiso vivo se comprueba en cada petición y en RLS: cuenta habilitada, clie
 En Supabase → **Authentication → OAuth Server**:
 
 1. Activar el servidor OAuth 2.1.
-2. **Authorization Path**: `/aplicacionInter/oauth/consent/`. Mantener **Site URL** en `https://emmanueltejero.github.io/aplicacionInter/`. Supabase abre `https://emmanueltejero.github.io/aplicacionInter/oauth/consent/?authorization_id=...` y el puente lleva a `https://emmanueltejero.github.io/aplicacionInter/?authorization_id=...`, donde se muestra el consentimiento. El path incluye el repositorio porque es una URL de GitHub Pages. La corrección del puente no requiere cambiar esa configuración.
+2. **Authorization Path**: `/aplicacionInter/`. Mantener **Site URL** en `https://emmanueltejero.github.io/aplicacionInter/`. Supabase abre directamente `https://emmanueltejero.github.io/aplicacionInter/?authorization_id=...`, donde la aplicación muestra el consentimiento. Esta es la entrada canónica; evita la ruta anidada que ha devuelto «Unmatched Route» en el navegador del propietario. Si todavía está configurado `/aplicacionInter/oauth/consent/`, sustituirlo por `/aplicacionInter/` y guardar. No cambia el callback OAuth de ChatGPT ni requiere publicar de nuevo la función.
 3. Mantener las claves asimétricas de firma (actualmente ES256). Nunca copiar la clave de firma, una Secret key ni `service_role` a ChatGPT.
 4. Activar **Allow Dynamic Client Registration (DCR)**, la vía de conexión automática documentada por Supabase y el ejemplo oficial de OpenAI. Puede registrar clientes nuevos, pero **el registro no da acceso a los datos**: nuestro hook y la lista permitida impiden usar clientes no habilitados.
 5. Una vez desplegada la función (paso 4), crear la app OAuth en ChatGPT (paso 5), sin rellenar Client ID/Secret si la interfaz permite registro automático. ChatGPT registrará su cliente y abrirá nuestra pantalla. Iniciar sesión: la pantalla mostrará que falta habilitar el cliente y su **UUID público**, con el botón de autorizar bloqueado.
@@ -129,7 +129,7 @@ deno run --allow-env --config supabase/functions/club-mcp/deno.json supabase/fun
 
 Probado localmente: ejecución Deno con JWT y backend ficticios, cliente oficial MCP y transporte 2025, firmas ES256 de prueba, rechazos de token/issuer/audience/rol/origen, valores y pendientes, filtros, RPCs/RLS en PostgreSQL PGlite con todas las migraciones, aislamiento entre entrenadores, lectura del admin sin escritura, revocación viva e idempotencia SQL. También han pasado la suite de la aplicación y las pruebas de consentimiento en Chromium móvil: login, aprobación explícita, denegación, cliente no habilitado y callback no admitido, con respuestas de Auth simuladas. No equivalen a una autorización real de Supabase. `.github/workflows/mcp-checks.yml` repite las pruebas de servidor en CI; **no despliega ni usa secretos**.
 
-Falta verificar en producción: activación OAuth, hook y cliente, despliegue Edge, renovación real del token y el recorrido completo dentro de ChatGPT con una cuenta del club. Tras conectarlo, comparar un mismo equipo/intervalo con **Resumen** y el detalle de **Partidos**; probar un entrenador asignado y otro no asignado, y denegar una autorización. Esto requiere las cuentas/autorizaciones reales y no se ha simulado como una prueba real.
+Verificado en producción: despliegue Edge, desafío HTTP 401, metadatos públicos y discovery OAuth con registro dinámico. Falta verificar hook/SQL, habilitar el cliente, renovar un token real y completar el recorrido dentro de ChatGPT con una cuenta del club. Tras conectarlo, comparar un mismo equipo/intervalo con **Resumen** y el detalle de **Partidos**; probar un entrenador asignado y otro no asignado, y denegar una autorización. Esto requiere las cuentas/autorizaciones reales y no se ha simulado como una prueba real.
 
 Para retirar acceso, desconectar/revocar la app en ChatGPT/Supabase OAuth. Además, el administrador puede poner `enabled=false` en `club_mcp_oauth_clients` y se bloquean inmediatamente los siguientes accesos en MCP y RLS; deshabilitar una cuenta o quitar su asignación también se comprueba en cada petición. La sola revocación de un refresh token no garantiza invalidar instantáneamente todos los access tokens JWT ya emitidos: mantener el control vivo de la tabla y un tiempo de expiración corto.
 

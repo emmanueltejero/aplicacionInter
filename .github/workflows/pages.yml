@@ -84,19 +84,25 @@ jobs:
             }
           }
           JS
+      - name: Preparar comprobación del navegador público
+        shell: bash
+        run: |
+          npm install --prefix "$RUNNER_TEMP/inter-oauth-browser-tools" --no-audit --no-fund --ignore-scripts playwright-core@1.64.1
       - name: Probar el consentimiento público en un navegador sin sesión
         shell: bash
         run: |
-          google-chrome --headless=new --no-sandbox --disable-dev-shm-usage --disable-gpu \
-            --user-data-dir="$RUNNER_TEMP/inter-oauth-browser" \
-            --virtual-time-budget=15000 --dump-dom \
-            "https://emmanueltejero.github.io/aplicacionInter/?authorization_id=deployment_probe&deployment_check=$GITHUB_SHA" \
-            > "$RUNNER_TEMP/inter-oauth-dom.html" 2> "$RUNNER_TEMP/inter-oauth-browser.log"
           node --input-type=module <<'JS'
-          import { readFile } from 'node:fs/promises';
-          const html = await readFile(`${process.env.RUNNER_TEMP}/inter-oauth-dom.html`, 'utf8');
-          if (html.includes('Unmatched Route') || !html.includes('Correo del club para autorizar ChatGPT')) {
-            throw new Error('La página pública no ha mostrado el formulario de consentimiento OAuth en el navegador sin sesión.');
+          import { createRequire } from 'node:module';
+          const { chromium } = createRequire(import.meta.url)(`${process.env.RUNNER_TEMP}/inter-oauth-browser-tools/node_modules/playwright-core`);
+          const browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--no-sandbox', '--disable-dev-shm-usage'] });
+          try {
+            const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+            const page = await context.newPage();
+            await page.goto(`https://emmanueltejero.github.io/aplicacionInter/?authorization_id=deployment_probe&deployment_check=${process.env.GITHUB_SHA}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+            await page.getByRole('textbox', { name: 'Correo del club para autorizar ChatGPT', exact: true }).waitFor({ timeout: 30000 });
+            if (await page.getByText('Unmatched Route', { exact: true }).count()) throw new Error('La URL pública muestra Unmatched Route.');
+            console.log('::notice::Consentimiento OAuth verificado en la URL pública principal con navegador sin sesión. No se ha iniciado sesión ni consultado datos del club.');
+          } finally {
+            await browser.close();
           }
-          console.log('::notice::Consentimiento OAuth verificado en la URL pública principal con navegador sin sesión. No se ha iniciado sesión ni consultado datos del club.');
           JS
