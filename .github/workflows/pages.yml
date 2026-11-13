@@ -50,3 +50,53 @@ jobs:
       - name: Publicar web
         id: deployment
         uses: actions/deploy-pages@v5
+      - name: Comprobar los archivos realmente publicados
+        shell: bash
+        run: |
+          node --input-type=module <<'JS'
+          import { readFile } from 'node:fs/promises';
+          const root = 'https://emmanueltejero.github.io/aplicacionInter/';
+          const expected = (await readFile('dist/oauth/consent/index.html', 'utf8')).trim();
+          const localHtml = await readFile('dist/index.html', 'utf8');
+          const scripts = html => [...html.matchAll(/<script\b[^>]*src="([^"]+)"/g)].map(item => item[1]);
+          const localScripts = scripts(localHtml);
+          if (!localScripts.length) throw new Error('El HTML generado no contiene la aplicación.');
+          for (let attempt = 1; attempt <= 12; attempt++) {
+            try {
+              const nonce = `${process.env.GITHUB_SHA}-${attempt}-${Date.now()}`;
+              const options = { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' }, signal: AbortSignal.timeout(15000) };
+              const page = await fetch(`${root}?deployment_check=${nonce}`, { ...options, signal: AbortSignal.timeout(15000) });
+              const html = await page.text();
+              if (page.status !== 200 || JSON.stringify(scripts(html)) !== JSON.stringify(localScripts)) {
+                throw new Error(`La raíz pública no corresponde a esta compilación (HTTP ${page.status}).`);
+              }
+              console.log('La aplicación raíz pública corresponde a esta compilación.');
+              const consent = await fetch(`${root}oauth/consent/?deployment_check=${nonce}`, { ...options, signal: AbortSignal.timeout(15000) });
+              const body = await consent.text();
+              if (consent.status !== 200 || body.trim() !== expected) {
+                console.log(`::warning::La ruta OAuth antigua no devuelve el puente generado (HTTP ${consent.status}, contiene aplicación SPA: ${body.includes('_expo/static')}). Usar Authorization Path /aplicacionInter/.`);
+              } else console.log('El puente de la ruta OAuth antigua también está actualizado.');
+              break;
+            } catch (error) {
+              if (attempt === 12) throw error;
+              console.log(`Esperando propagación de GitHub Pages (${attempt}/12).`);
+              await new Promise(resolve => setTimeout(resolve, 10000));
+            }
+          }
+          JS
+      - name: Probar el consentimiento público en un navegador sin sesión
+        shell: bash
+        run: |
+          google-chrome --headless=new --no-sandbox --disable-dev-shm-usage --disable-gpu \
+            --user-data-dir="$RUNNER_TEMP/inter-oauth-browser" \
+            --virtual-time-budget=15000 --dump-dom \
+            "https://emmanueltejero.github.io/aplicacionInter/?authorization_id=deployment_probe&deployment_check=$GITHUB_SHA" \
+            > "$RUNNER_TEMP/inter-oauth-dom.html" 2> "$RUNNER_TEMP/inter-oauth-browser.log"
+          node --input-type=module <<'JS'
+          import { readFile } from 'node:fs/promises';
+          const html = await readFile(`${process.env.RUNNER_TEMP}/inter-oauth-dom.html`, 'utf8');
+          if (html.includes('Unmatched Route') || !html.includes('Correo del club para autorizar ChatGPT')) {
+            throw new Error('La página pública no ha mostrado el formulario de consentimiento OAuth en el navegador sin sesión.');
+          }
+          console.log('::notice::Consentimiento OAuth verificado en la URL pública principal con navegador sin sesión. No se ha iniciado sesión ni consultado datos del club.');
+          JS
