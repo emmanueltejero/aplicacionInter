@@ -48,19 +48,20 @@ Los scopes OAuth solicitados son `openid`; identifican el flujo de autenticació
 
 ## 4. Desplegar la Edge Function
 
-En un ordenador con el repositorio actualizado y Supabase CLI instalado, desde la raíz:
+**No necesitas instalar programas ni usar la terminal de tu ordenador.** El workflow [Publicar conexión con ChatGPT](https://github.com/emmanueltejero/aplicacionInter/actions/workflows/mcp-deploy.yml) instala la CLI y empaqueta el servidor dentro de GitHub Actions.
 
-```bash
-supabase login
-supabase link --project-ref corcjvflavfpvzgyvpyb
-supabase functions deploy club-mcp --project-ref corcjvflavfpvzgyvpyb --no-verify-jwt
-```
+1. Abre [Supabase → Account → Access Tokens](https://supabase.com/dashboard/account/tokens) y crea un token para desplegar la función. Si se ofrecen tokens con ámbito, limita el acceso al proyecto del club y a los permisos que pide el despliegue de Edge Functions (`edge_functions_write`; `projects_read` y lecturas de proyecto/rama si las solicita la CLI). No uses la contraseña de la base de datos ni una API key `service_role`. Si solo se ofrece un token personal de cuenta, ten en cuenta que tiene permisos más amplios: consérvalo únicamente en los secretos de GitHub y puedes revocarlo al terminar; se necesitará otro para futuras publicaciones.
+2. Abre [crear secreto de GitHub Actions](https://github.com/emmanueltejero/aplicacionInter/settings/secrets/actions/new). **Name**: `CLUB_MCP_DEPLOY_TOKEN`. **Secret**: el token que acabas de crear. Pulsa **Add secret**. No lo pegues en este chat, en archivos ni en variables públicas.
+3. Abre [Publicar conexión con ChatGPT](https://github.com/emmanueltejero/aplicacionInter/actions/workflows/mcp-deploy.yml), pulsa **Run workflow**, selecciona **main** y confirma **Run workflow**.
+4. Espera al resultado verde. El flujo primero ejecuta las pruebas y luego publica **solo `club-mcp`** en el proyecto fijo del club. Usa la API de empaquetado, sin Docker ni programas en tu dispositivo. Comprueba únicamente que la función exige autenticación y devuelve metadatos públicos correctos. No consulta datos reales, ejecuta SQL ni configura OAuth. Si falta el secreto, muestra su nombre y se detiene sin publicarlo.
 
-El login se hace en el navegador/CLI; no se guardan credenciales en este repositorio. No ejecutar `db push` para reaplicar todo el historial de migraciones gestionadas manualmente.
+El token solo se entrega al paso de despliegue, después de instalar la CLI. No se imprime ni se entrega a las pruebas. La comprobación posterior no tiene ese token y no autentica como un entrenador. El workflow solo se ejecuta manualmente desde `main`; no publica automáticamente con cada cambio.
+
+**Alternativa para quien ya utilice una terminal:** con Supabase CLI 3.1.0, desde la raíz del repositorio, `supabase login` y después `supabase functions deploy club-mcp --remote=corcjvflavfpvzgyvpyb --no-verify-jwt --use-api --yes`. El argumento actual es `--remote`; la opción antigua `--project-ref` de versiones anteriores no se debe copiar en esta versión. La terminal y `supabase link` no son requisitos para usar el botón de GitHub. No ejecutar `db push` para reaplicar todo el historial de migraciones gestionadas manualmente.
 
 `verify_jwt=false` es intencionado: discovery debe funcionar sin sesión y el gateway no sustituye nuestras verificaciones de issuer/audience/rol. La función valida cada JWT y el acceso antes de exponer herramientas. Usa `SUPABASE_URL` y las Publishable/anon keys que Supabase proporciona. No añadir Secret key ni service key. `CLUB_MCP_RESOURCE_URL` es opcional; el valor calculado ya coincide con la URL pública. Si se cambia el dominio, actualizarlo también en la lista SQL y renovar las autorizaciones.
 
-Publicar desde CLI es necesario porque se empaquetan los módulos de cálculo originales de `src/`. **No pegar únicamente `index.ts` en el editor web**: faltaría el resto del servidor y los módulos compartidos.
+El workflow usa la CLI para empaquetar también los módulos de cálculo originales de `src/`. **No pegar únicamente `index.ts` en el editor web**: faltaría el resto del servidor y los módulos compartidos.
 
 Comprobar sin token (solo metadata, sin datos personales):
 

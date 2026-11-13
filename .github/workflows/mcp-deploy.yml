@@ -1,0 +1,97 @@
+name: Publicar conexión con ChatGPT
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: club-mcp-deploy
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Comprobar rama
+        if: github.ref != 'refs/heads/main'
+        run: |
+          echo 'Elige la rama main para publicar la conexión con ChatGPT.'
+          exit 1
+      - name: Descargar código
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Preparar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Instalar dependencias de comprobación
+        run: npm ci --prefix supabase/functions/club-mcp --ignore-scripts --no-audit --no-fund
+      - name: Comprobar tipos, autenticación y permisos de solo lectura
+        run: npm run typecheck --prefix supabase/functions/club-mcp && npm test --prefix supabase/functions/club-mcp
+
+  deploy:
+    needs: verify
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Descargar código comprobado
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Preparar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Instalar Supabase CLI oficial
+        shell: bash
+        run: |
+          npm install --prefix "$RUNNER_TEMP/club-mcp-cli" --no-audit --no-fund supabase@3.1.0
+          echo "$RUNNER_TEMP/club-mcp-cli/node_modules/.bin" >> "$GITHUB_PATH"
+      - name: Publicar únicamente la función club-mcp
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.CLUB_MCP_DEPLOY_TOKEN }}
+          DO_NOT_TRACK: '1'
+        shell: bash
+        run: |
+          if [ -z "$SUPABASE_ACCESS_TOKEN" ]; then
+            echo 'Falta el secreto CLUB_MCP_DEPLOY_TOKEN. Sigue supabase/MCP.md; no envíes el token por el chat.'
+            exit 1
+          fi
+          supabase functions deploy club-mcp --remote=corcjvflavfpvzgyvpyb --no-verify-jwt --use-api --yes
+      - name: Comprobar autenticación y metadatos públicos
+        shell: bash
+        run: |
+          node --input-type=module <<'JS'
+          const url = 'https://corcjvflavfpvzgyvpyb.supabase.co/functions/v1/club-mcp';
+          const retry = async check => {
+            for (let attempt = 0; attempt < 6; attempt++) {
+              try { return await check(); } catch (error) {
+                if (attempt === 5) throw error;
+                await new Promise(resolve => setTimeout(resolve, 5000));
+              }
+            }
+          };
+          await retry(async () => {
+            const auth = await fetch(url, { signal: AbortSignal.timeout(15000) });
+            if (auth.status !== 401 || !auth.headers.get('www-authenticate')?.includes(`${url}/.well-known/oauth-protected-resource`)) {
+              throw new Error('La función debe exigir OAuth con HTTP 401 y anunciar sus metadatos.');
+            }
+            const response = await fetch(`${url}/.well-known/oauth-protected-resource`, { signal: AbortSignal.timeout(15000) });
+            if (!response.ok) throw new Error('No se pudieron leer los metadatos públicos.');
+            const data = await response.json();
+            if (data.resource !== url || !data.authorization_servers?.includes('https://corcjvflavfpvzgyvpyb.supabase.co/auth/v1')) {
+              throw new Error('Los metadatos OAuth no corresponden a este proyecto.');
+            }
+          });
+          console.log('Función publicada: exige autenticación. No se han consultado datos del club.');
+          JS
+      - name: Indicar resultado
+        shell: bash
+        run: |
+          echo 'Función publicada: https://corcjvflavfpvzgyvpyb.supabase.co/functions/v1/club-mcp' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Este flujo no ejecuta SQL ni configura OAuth. Completa esos pasos en supabase/MCP.md y prueba la conexión desde ChatGPT.' >> "$GITHUB_STEP_SUMMARY"
