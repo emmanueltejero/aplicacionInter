@@ -2,6 +2,10 @@
 
 Primera versión de la aplicación del club, creada con React Native, Expo y TypeScript para Android, iOS y web.
 
+## Conexión de consulta con ChatGPT
+
+El servidor MCP autenticado está preparado en `supabase/functions/club-mcp/`, con cinco herramientas de lectura y los cálculos originales de asistencia/minutos. Usa OAuth de Supabase y un rol RLS específico que no puede escribir, ni siquiera con una cuenta administradora. Su activación requiere ejecutar la nueva migración, configurar cliente/hook OAuth y desplegar la Edge Function: [pasos exactos, URL prevista y verificación](supabase/MCP.md). La pantalla de consentimiento se publica con la web; eso no activa por sí solo el servidor ni comparte datos.
+
 ## Estado actual
 
 - Pantalla de acceso por correo/contraseña con Supabase y recuperación de sesión. Sin alta pública desde la app; el club gestiona las cuentas.

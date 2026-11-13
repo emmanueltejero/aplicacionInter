@@ -1,4 +1,4 @@
-import type { Attendance, Player, Register } from './domain';
+import type { Attendance, Player, Register } from './domain.ts';
 
 export type ReportFilters = { from: string; to: string; includeArchived: boolean };
 export type PlayerReport = {

@@ -1,0 +1,21 @@
+{
+  "name": "inter-club-mcp",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/server": "2.4.0",
+    "jose": "6.2.17",
+    "zod": "4.3.6"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.5.15",
+    "@modelcontextprotocol/client": "2.4.0",
+    "@types/node": "24.10.1",
+    "typescript": "6.0.3"
+  }
+}

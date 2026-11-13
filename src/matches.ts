@@ -1,4 +1,4 @@
-import type { Player } from './domain';
+import type { Player } from './domain.ts';
 export { newRecordId as newMatchId } from './recordId.js';
 
 export type MatchEntry = { playerId: string; minutes: number | null };

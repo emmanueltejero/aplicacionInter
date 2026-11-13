@@ -1,0 +1,121 @@
+{
+  "version": "5",
+  "specifiers": {
+    "npm:@electric-sql/pglite@0.5.15": "0.5.15",
+    "npm:@modelcontextprotocol/client@2.4.0": "2.4.0",
+    "npm:@modelcontextprotocol/server@2.4.0": "2.4.0",
+    "npm:@types/node@24.10.1": "24.10.1",
+    "npm:jose@6.2.17": "6.2.17",
+    "npm:typescript@6.0.3": "6.0.3",
+    "npm:zod@4.3.6": "4.3.6"
+  },
+  "npm": {
+    "@electric-sql/pglite@0.5.15": {
+      "integrity": "sha512-ERZWgaRTxueGV4cvL1tfpAOzFCWTXoUtbCBqnf2FhHDVs/so9eAKaanvrwWF9Dntx7BYsmFQujVQ0/B4S8Mmiw=="
+    },
+    "@modelcontextprotocol/client@2.4.0": {
+      "integrity": "sha512-LgrD2OphHuG12vfKFKz6SOnq7bKHQmhGJIAYdD+MZBn2npHEyry6uD8zvktodtl5CQM85MO0anUyD9JwmUmxww==",
+      "dependencies": [
+        "@modelcontextprotocol/core",
+        "cross-spawn",
+        "eventsource",
+        "eventsource-parser",
+        "jose",
+        "pkce-challenge",
+        "zod"
+      ]
+    },
+    "@modelcontextprotocol/core@2.4.0": {
+      "integrity": "sha512-z8QBKqdfXLPzkLQuG4xp8hrVEMm1PZ1IgxMN2sMbJiFiAKOWXnAzogXn2W4aqIBlP1ea6U5yiqVquvUNM1Cj6Q==",
+      "dependencies": [
+        "zod"
+      ]
+    },
+    "@modelcontextprotocol/server@2.4.0": {
+      "integrity": "sha512-rgR9yxSaAJ+bcsi/XroT/S2AfPiIWloXAnrdfYSCms9ivVju0ishu/wW0J21Ho6+ZOR1r7RyeRbjiRuF87ix5Q==",
+      "dependencies": [
+        "@modelcontextprotocol/core",
+        "zod"
+      ]
+    },
+    "@types/node@24.10.1": {
+      "integrity": "sha512-GNWcUTRBgIRJD5zj+Tq0fKOJ5XZajIiBroOF0yvj2bSU1WvNdYS/dn9UxwsujGW4JX06dnHyjV2y9rRaybH0iQ==",
+      "dependencies": [
+        "undici-types"
+      ]
+    },
+    "cross-spawn@7.0.6": {
+      "integrity": "sha512-uV2QOWP2nWzsy2aMp8aRibhi9dlzF5Hgh5SHaB9OiTGEyDTiJJyx0uy51QXdyWbtAHNua4XJzUKca3OzKUd3vA==",
+      "dependencies": [
+        "path-key",
+        "shebang-command",
+        "which"
+      ]
+    },
+    "eventsource-parser@3.1.1": {
+      "integrity": "sha512-EKN1vKAMcZ8MlYMpaNuxN6R9yakzH6uajHcHVTqWJzvu5pWw9DyhbP35HH8MVBQ+dZjAfDxk+A8NiR9KWaXiyQ=="
+    },
+    "eventsource@3.0.7": {
+      "integrity": "sha512-CRT1WTyuQoD771GW56XEZFQ/ZoSfWid1alKGDYMmkt2yl8UXrVR4pspqWNEcqKvVIzg6PAltWjxcSSPrboA4iA==",
+      "dependencies": [
+        "eventsource-parser"
+      ]
+    },
+    "isexe@2.0.0": {
+      "integrity": "sha512-RHxMLp9lnKHGHRng9QFhRCMbYAcVpn69smSGcq3f36xjgVVWThj4qqLbTLlq7Ssj8B+fIQ1EuCEGI2lKsyQeIw=="
+    },
+    "jose@6.2.17": {
+      "integrity": "sha512-wOuK9V1yujQFH5S0ZWmLcDZN7+IKh9bUCC2ZPCf2HDlol3WWHy+PPyNjEI75FXRLMp3vDKQcupP59xhVU95hcg=="
+    },
+    "path-key@3.1.1": {
+      "integrity": "sha512-ojmeN0qd+y0jszEtoY48r0Peq5dwMEkIlCOu6Q5f41lfkswXuKtYrhgoTpLnyIcHm24Uhqx+5Tqm2InSwLhE6Q=="
+    },
+    "pkce-challenge@5.0.1": {
+      "integrity": "sha512-wQ0b/W4Fr01qtpHlqSqspcj3EhBvimsdh0KlHhH8HRZnMsEa0ea2fTULOXOS9ccQr3om+GcGRk4e+isrZWV8qQ=="
+    },
+    "shebang-command@2.0.0": {
+      "integrity": "sha512-kHxr2zZpYtdmrN1qDjrrX/Z1rR1kG8Dx+gkpK1G4eXmvXswmcE1hTWBWYUzlraYw1/yZp6YuDY77YtvbN0dmDA==",
+      "dependencies": [
+        "shebang-regex"
+      ]
+    },
+    "shebang-regex@3.0.0": {
+      "integrity": "sha512-7++dFhtcx3353uBaq8DDR4NuxBetBzC7ZQOhmTQInHEd6bSrXdiEyzCvG07Z44UYdLShWUyXt5M/yhz8ekcb1A=="
+    },
+    "typescript@6.0.3": {
+      "integrity": "sha512-y2TvuxSZPDyQakkFRPZHKFm+KKVqIisdg9/CZwm9ftvKXLP8NRWj38/ODjNbr43SsoXqNuAisEf1GdCxqWcdBw==",
+      "bin": true
+    },
+    "undici-types@7.16.0": {
+      "integrity": "sha512-Zz+aZWSj8LE6zoxD+xrjh4VfkIG8Ya6LvYkZqtUQGJPZjYl53ypCaUwWqo7eI0x66KBGeRo+mlBEkMSeSZ38Nw=="
+    },
+    "which@2.0.2": {
+      "integrity": "sha512-BLI3Tl1TW3Pvl70l3yq3Y64i+awpwXqsGBYWkkqMtnbXgrMD+yj7rhW0kuEDxzJaYXGjEW5ogapKNMEKNMjibA==",
+      "dependencies": [
+        "isexe"
+      ],
+      "bin": true
+    },
+    "zod@4.3.6": {
+      "integrity": "sha512-rftlrkhHZOcjDwkGlnUtZZkvaPHCsDATp4pGpuOOMDaTdDDXF91wuVDJoWoPsKX/3YPQ5fHuF3STjcYyKr+Qhg=="
+    }
+  },
+  "workspace": {
+    "dependencies": [
+      "npm:@modelcontextprotocol/server@2.4.0",
+      "npm:jose@6.2.17",
+      "npm:zod@4.3.6"
+    ],
+    "packageJson": {
+      "dependencies": [
+        "npm:@electric-sql/pglite@0.5.15",
+        "npm:@modelcontextprotocol/client@2.4.0",
+        "npm:@modelcontextprotocol/server@2.4.0",
+        "npm:@types/node@24.10.1",
+        "npm:jose@6.2.17",
+        "npm:typescript@6.0.3",
+        "npm:zod@4.3.6"
+      ]
+    }
+  }
+}

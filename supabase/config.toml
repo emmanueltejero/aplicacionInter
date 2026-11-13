@@ -3,3 +3,8 @@
 # signing-key configuration; it must not replace the in-function checks.
 [functions.club-users]
 verify_jwt = false
+
+# RFC 9728 discovery is public. club-mcp verifies asymmetric JWT signatures,
+# issuer, MCP audience, read-only role and live club/team access itself.
+[functions.club-mcp]
+verify_jwt = false

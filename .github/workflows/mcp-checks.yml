@@ -1,0 +1,25 @@
+name: Verificar MCP de consultas
+on:
+  push:
+    branches: [main]
+    paths: ['supabase/functions/club-mcp/**', 'supabase/migrations/**', 'src/attendanceReport.ts', 'src/domain.ts', 'src/matches.ts', '.github/workflows/mcp-checks.yml']
+  pull_request:
+    paths: ['supabase/functions/club-mcp/**', 'supabase/migrations/**', 'src/attendanceReport.ts', 'src/domain.ts', 'src/matches.ts', '.github/workflows/mcp-checks.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: supabase/functions/club-mcp
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: supabase/functions/club-mcp/package-lock.json
+      - run: npm ci --no-audit --no-fund --ignore-scripts
+      - run: npm run typecheck && npm test

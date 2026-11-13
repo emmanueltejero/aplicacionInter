@@ -1,0 +1,9 @@
+{
+  "imports": {
+    "@modelcontextprotocol/server": "npm:@modelcontextprotocol/server@2.4.0",
+    "jose": "npm:jose@6.2.17",
+    "zod": "npm:zod@4.3.6"
+  },
+  "compilerOptions": { "strict": true },
+  "nodeModulesDir": "auto"
+}
