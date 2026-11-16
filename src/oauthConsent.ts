@@ -10,6 +10,16 @@ export function validAuthorizationId(value: unknown): value is string {
   return typeof value === 'string' && /^[A-Za-z0-9_-]{1,512}$/.test(value);
 }
 
+// The browser URL is authoritative on web, including when a saved navigator
+// state has selected the unmatched-route screen or retained older parameters.
+export function authorizationRequest(routeValue: unknown, browserSearch?: string): { present: boolean; id?: string } {
+  if (browserSearch !== undefined) {
+    const values = new URLSearchParams(browserSearch).getAll('authorization_id');
+    return { present: values.length > 0, id: values.length === 1 && validAuthorizationId(values[0]) ? values[0] : undefined };
+  }
+  return { present: routeValue !== undefined, id: validAuthorizationId(routeValue) ? routeValue : undefined };
+}
+
 export type ConsentStage = 'session' | 'request' | 'callback' | 'permission' | 'decision';
 export function consentFailure(cause: unknown, stage: ConsentStage, callback = '', clientId = '') {
   const value = cause && typeof cause === 'object' ? cause as { code?: unknown; status?: unknown } : {};

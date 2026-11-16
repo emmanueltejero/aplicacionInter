@@ -25,6 +25,8 @@ El permiso vivo se comprueba en cada petición y en RLS: cuenta habilitada, clie
 2. En Supabase → **SQL Editor → New query**, ejecutar **todo** `supabase/migrations/202611130001_club_mcp.sql`. Es repetible y conserva el historial. No vuelvas a ejecutar el SQL inicial del club.
 3. No conceder `authenticated` al nuevo rol ni SELECT/EXECUTE adicionales. El rol necesita pertenecer a `authenticator` para que PostgREST lo seleccione; la migración lo prepara.
 
+La exportación web carga las rutas de forma síncrona (opción de Expo Router 58) y reconoce la solicitud a partir de la query real del navegador, evitando parámetros antiguos del estado de navegación. `+not-found` reutiliza el mismo consentimiento cuando un enlace OAuth cae en una ruta no reconocida; las comprobaciones de sesión, solicitud, callback y cliente siguen siendo obligatorias. Los enlaces desconocidos sin solicitud muestran una página de recuperación normal.
+
 ## 3. Activar Supabase Auth como servidor OAuth
 
 En Supabase → **Authentication → OAuth Server**:

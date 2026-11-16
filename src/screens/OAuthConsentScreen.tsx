@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Linking, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Link, useLocalSearchParams } from 'expo-router';
+import { Link } from 'expo-router';
 import type { OAuthAuthorizationDetails } from '@supabase/supabase-js';
 import { supabase } from '../data/supabase';
 import { chatGptCallback, consentFailure, validAuthorizationId } from '../oauthConsent';
 import type { ConsentStage } from '../oauthConsent';
 import { trainingStyles as s } from '../components/trainingStyles';
+import { useAuthorizationRequest } from '../components/useAuthorizationRequest';
 
 function redirect(value: string) {
   const url = chatGptCallback(value);
@@ -14,7 +15,7 @@ function redirect(value: string) {
   else void Linking.openURL(url);
 }
 export default function OAuthConsentScreen() {
-  const { authorization_id } = useLocalSearchParams<{ authorization_id?: string }>();
+  const { id: authorization_id } = useAuthorizationRequest();
   const [loading, setLoading] = useState(true), [signedIn, setSignedIn] = useState(false), [busy, setBusy] = useState(false);
   const [details, setDetails] = useState<OAuthAuthorizationDetails | null>(null), [allowed, setAllowed] = useState(false);
   const [email, setEmail] = useState(''), [password, setPassword] = useState(''), [error, setError] = useState(''), [attempt, setAttempt] = useState(0);

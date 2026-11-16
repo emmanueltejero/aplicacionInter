@@ -96,12 +96,29 @@ jobs:
           const { chromium } = createRequire(import.meta.url)(`${process.env.RUNNER_TEMP}/inter-oauth-browser-tools/node_modules/playwright-core`);
           const browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--no-sandbox', '--disable-dev-shm-usage'] });
           try {
-            const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
-            const page = await context.newPage();
-            await page.goto(`https://emmanueltejero.github.io/aplicacionInter/?authorization_id=deployment_probe&deployment_check=${process.env.GITHUB_SHA}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
-            await page.getByRole('textbox', { name: 'Correo del club para autorizar ChatGPT', exact: true }).waitFor({ timeout: 30000 });
-            if (await page.getByText('Unmatched Route', { exact: true }).count()) throw new Error('La URL pública muestra Unmatched Route.');
-            console.log('::notice::Consentimiento OAuth verificado en la URL pública principal con navegador sin sesión. No se ha iniciado sesión ni consultado datos del club.');
+            const root = 'https://emmanueltejero.github.io/aplicacionInter/';
+            const variants = [
+              '?authorization_id=00000000000000000000000000000000',
+              `?authorization_id=deployment_probe&deployment_check=${process.env.GITHUB_SHA}`,
+              'oauth-link-recovery/?authorization_id=00000000000000000000000000000000',
+            ];
+            for (const query of variants) {
+              const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+              const page = await context.newPage();
+              await page.goto(root + query, { waitUntil: 'domcontentloaded', timeout: 30000 });
+              const field = page.getByRole('textbox', { name: 'Correo del club para autorizar ChatGPT', exact: true });
+              await field.waitFor({ timeout: 30000 });
+              await field.click();
+              await page.waitForTimeout(5000);
+              if ((await page.locator('body').innerText()).includes('Unmatched Route') || !await field.isVisible()) {
+                throw new Error('La URL pública no mantiene visible el formulario de consentimiento.');
+              }
+              await page.reload({ waitUntil: 'domcontentloaded', timeout: 30000 });
+              await field.waitFor({ timeout: 30000 });
+              if ((await page.locator('body').innerText()).includes('Unmatched Route')) throw new Error('La recarga pública muestra Unmatched Route.');
+              await context.close();
+            }
+            console.log('::notice::Consentimiento OAuth público verificado con authorization_id únicamente, parámetro de comprobación y recuperación de ruta desconocida, incluyendo estabilidad y recarga. Sin sesión ni datos del club.');
           } finally {
             await browser.close();
           }
