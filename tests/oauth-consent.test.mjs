@@ -9,6 +9,27 @@ test('consent accepts opaque authorization IDs and only approved HTTPS ChatGPT c
   for (const origin of ['https://chatgpt.com', 'https://chat.openai.com']) assert.equal(chatGptCallback(origin+'/connector_platform/oauth/callback?code=test&state=s'), origin+'/connector_platform/oauth/callback?code=test&state=s');
   for (const value of ['javascript:alert(1)', 'https://evil.invalid/connector_platform/oauth/callback', 'https://chatgpt.com.evil.invalid/connector_platform/oauth/callback', 'https://chatgpt.com/login', 'https://user:password@chatgpt.com/connector_platform/oauth/callback', 'https://chatgpt.com/connector_platform/oauth/callback#access_token=secret']) assert.throws(() => chatGptCallback(value));
 });
+test('current connector callbacks preserve OAuth success and denial parameters and reject other destinations', () => {
+  const callback = 'https://chatgpt.com/connector/oauth/TestConnector_123-abc';
+  for (const query of ['', '?code=fake-code&state=fake-state', '?error=access_denied&state=fake-state']) assert.equal(chatGptCallback(callback + query), callback + query);
+  for (const value of [
+    'http://chatgpt.com/connector/oauth/TestConnector',
+    'https://chatgpt.com:444/connector/oauth/TestConnector',
+    'https://chat.openai.com/connector/oauth/TestConnector',
+    'https://chatgpt.com.evil.invalid/connector/oauth/TestConnector',
+    'https://evil.invalid/connector/oauth/TestConnector',
+    'https://user:password@chatgpt.com/connector/oauth/TestConnector',
+    callback + '#access_token=fake-token',
+    'https://chatgpt.com/connector/oauth/',
+    callback + '/extra',
+    callback + '/',
+    'https://chatgpt.com/connector/oauth/id%2Fextra',
+    'https://chatgpt.com/connector/oauth/id%5Cextra',
+    'https://chatgpt.com/connector/oauth/id%20extra',
+    'https://chatgpt.com/connector/oauth/' + 'x'.repeat(129),
+    'https://chatgpt.com/connector/other/TestConnector',
+  ]) assert.throws(() => chatGptCallback(value), value);
+});
 test('web authorization uses the actual URL instead of stale navigator params and rejects ambiguous or malformed request IDs', () => {
   assert.deepEqual(authorizationRequest('old-request', '?authorization_id=new-request'), { present: true, id: 'new-request' });
   assert.deepEqual(authorizationRequest('old-request', ''), { present: false, id: undefined });
