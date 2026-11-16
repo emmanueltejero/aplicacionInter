@@ -4,7 +4,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Link, useLocalSearchParams } from 'expo-router';
 import type { OAuthAuthorizationDetails } from '@supabase/supabase-js';
 import { supabase } from '../data/supabase';
-import { chatGptCallback, validAuthorizationId } from '../oauthConsent';
+import { chatGptCallback, consentFailure, validAuthorizationId } from '../oauthConsent';
+import type { ConsentStage } from '../oauthConsent';
 import { trainingStyles as s } from '../components/trainingStyles';
 
 function redirect(value: string) {
@@ -17,25 +18,33 @@ export default function OAuthConsentScreen() {
   const [loading, setLoading] = useState(true), [signedIn, setSignedIn] = useState(false), [busy, setBusy] = useState(false);
   const [details, setDetails] = useState<OAuthAuthorizationDetails | null>(null), [allowed, setAllowed] = useState(false);
   const [email, setEmail] = useState(''), [password, setPassword] = useState(''), [error, setError] = useState(''), [attempt, setAttempt] = useState(0);
+  const [diagnostic, setDiagnostic] = useState('');
   const lock = useRef(false);
   const validId = validAuthorizationId(authorization_id);
   useEffect(() => {
     let active = true;
     async function load() {
-      setLoading(true); setError(''); setDetails(null); setAllowed(false);
+      setLoading(true); setError(''); setDiagnostic(''); setDetails(null); setAllowed(false);
       if (!supabase || !validId) { setError('Falta una solicitud válida de autorización. Inicia la conexión desde ChatGPT.'); setLoading(false); return; }
+      let stage: ConsentStage = 'session', callback = '', clientId = '';
       try {
         const { data: { user }, error: sessionError } = await supabase.auth.getUser();
         if (!active) return;
         setSignedIn(!!user && !sessionError);
         if (!user || sessionError) return;
+        stage = 'request';
         const { data, error: authError } = await supabase.auth.oauth.getAuthorizationDetails(authorization_id!);
-        if (authError || !data) throw new Error();
-        if ('redirect_url' in data) { if (active) redirect(data.redirect_url); return; }
+        if (authError) throw authError;
+        if (!data) throw new Error();
+        stage = 'callback';
+        if ('redirect_url' in data) { callback = data.redirect_url; if (active) redirect(data.redirect_url); return; }
+        callback = data.redirect_uri; clientId = data.client.id;
         chatGptCallback(data.redirect_uri);
+        stage = 'permission';
         const permission = await supabase.rpc('club_mcp_client_allowed', { p_client: data.client.id });
+        if (permission.error) throw permission.error;
         if (active) { setDetails(data); setAllowed(!permission.error && permission.data === true); }
-      } catch { if (active) setError('No se pudo comprobar esta autorización. Reintenta la conexión desde ChatGPT o consulta al administrador.'); }
+      } catch (cause) { if (active) { const failure = consentFailure(cause, stage, callback, clientId); setError(failure.message); setDiagnostic(failure.diagnostic); } }
       finally { if (active) setLoading(false); }
     }
     void load();
@@ -43,7 +52,7 @@ export default function OAuthConsentScreen() {
   }, [authorization_id, validId, attempt]);
   async function signIn() {
     if (!supabase || lock.current) return;
-    lock.current = true; setBusy(true); setError('');
+    lock.current = true; setBusy(true); setError(''); setDiagnostic('');
     try {
       const result = await supabase.auth.signInWithPassword({ email: email.trim(), password });
       if (result.error) throw new Error();
@@ -53,14 +62,17 @@ export default function OAuthConsentScreen() {
   }
   async function decide(approve: boolean) {
     if (!supabase || !details || lock.current || (approve && !allowed)) return;
-    lock.current = true; setBusy(true); setError('');
+    lock.current = true; setBusy(true); setError(''); setDiagnostic('');
+    let stage: ConsentStage = 'decision', callback = '';
     try {
       const result = approve
         ? await supabase.auth.oauth.approveAuthorization(details.authorization_id, { skipBrowserRedirect: true })
         : await supabase.auth.oauth.denyAuthorization(details.authorization_id, { skipBrowserRedirect: true });
-      if (result.error || !result.data?.redirect_url) throw new Error();
+      if (result.error) throw result.error;
+      if (!result.data?.redirect_url) throw new Error();
+      stage = 'callback'; callback = result.data.redirect_url;
       redirect(result.data.redirect_url);
-    } catch { setError('No se pudo completar la autorización. Vuelve a iniciar la conexión desde ChatGPT.'); }
+    } catch (cause) { const failure = consentFailure(cause, stage, callback, details.client.id); setError(failure.message); setDiagnostic(failure.diagnostic); }
     finally { lock.current = false; setBusy(false); }
   }
   return <SafeAreaView style={{ flex: 1, backgroundColor: '#F4F7FA' }}><ScrollView contentContainerStyle={{ padding: 18, gap: 16, width: '100%', maxWidth: 600, alignSelf: 'center' }} keyboardShouldPersistTaps="handled">
@@ -80,6 +92,7 @@ export default function OAuthConsentScreen() {
       <Pressable accessibilityRole="button" disabled={busy} style={s.secondary} onPress={() => { void decide(false); }}><Text style={s.blue}>Denegar acceso</Text></Pressable>
     </View>}
     {!!error && <Text accessibilityRole="alert" style={s.error}>{error}</Text>}
+    {!!diagnostic && <Text selectable accessibilityLabel="Diagnóstico de autorización OAuth" style={s.small}>{diagnostic}</Text>}
     {!loading && signedIn && <Pressable accessibilityRole="button" disabled={busy} style={s.secondary} onPress={() => setAttempt(value => value + 1)}><Text style={s.blue}>Reintentar autorización</Text></Pressable>}
     <Link href="/" style={s.blue}>Volver a la aplicación del club</Link>
   </ScrollView></SafeAreaView>;
