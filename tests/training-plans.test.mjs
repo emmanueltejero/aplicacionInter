@@ -44,6 +44,22 @@ test('snapshot creation does not retain mutable category or material references'
   mutable.title = 'Nuevo nombre'; mutable.materials[0].quantity = 100; mutable.categories.push('Técnica');
   assert.equal(snapshot.title, 'Rondo'); assert.equal(snapshot.materials[0].quantity, 4); assert.deepEqual(snapshot.categories, ['Posesión']);
 });
+test('block notes are independent for repeated exercises, survive copies and keep legacy plans readable', () => {
+  const repeated = { ...plan, entries: [{ ...a, sessionNotes: '  Grupo azul\nRotar cada 2 minutos.  ' }, { ...a, id: id(30), sessionNotes: 'Grupo negro' }] };
+  const clean = validateTraining(trainingDraft(repeated));
+  assert.deepEqual(clean.entries.map(entry => entry.sessionNotes), ['Grupo azul\nRotar cada 2 minutos.', 'Grupo negro']);
+  assert.deepEqual(parseTrainingPlans(JSON.stringify([repeated])), [repeated]);
+  const copy = cloneTrainingPlan(repeated, { id: id(200), sourceId: repeated.id, sourceRevision: 1, date: '2026-11-17', title: 'Copia' }, 'coach', (() => { let n = 300; return () => id(n++); })());
+  copy.entries[0].sessionNotes = 'Otra organización';
+  assert.equal(repeated.entries[0].sessionNotes, '  Grupo azul\nRotar cada 2 minutos.  ');
+  assert.equal(copy.entries[1].sessionNotes, 'Grupo negro');
+  const legacy = { ...plan, entries: plan.entries.map(({ sessionNotes, ...entry }) => entry) };
+  assert.deepEqual(parseTrainingPlans(JSON.stringify([legacy])), [legacy]);
+  assert.ok(validateTraining(trainingDraft(legacy)).entries.every(entry => entry.sessionNotes === ''));
+  assert.equal(entryFromExercise(exercise, id(50)).sessionNotes, '');
+  for (const sessionNotes of [null, 3, {}, 'x'.repeat(2001)]) assert.throws(() => validateTraining(trainingDraft({ ...plan, entries: [{ ...a, sessionNotes }] })));
+  assert.equal(validateTraining(trainingDraft({ ...plan, entries: [{ ...a, sessionNotes: 'x'.repeat(2000) }] })).entries[0].sessionNotes.length, 2000);
+});
 test('date filters include boundaries and future plans and keep archived plans optional', () => {
   const future = { ...plan, id: id(101), date: '2026-12-01' }, archived = { ...plan, id: id(102), archivedAt: '2026-11-10T12:00:00Z' };
   assert.equal(filterTrainingPlans([plan, future, archived], '2026-11-10', '2026-11-10', false).length, 1);

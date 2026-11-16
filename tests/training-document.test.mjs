@@ -19,11 +19,22 @@ test('document includes saved notes, full exercise development, timeline and reu
 });
 test('print HTML escapes all coach-entered fields and embeds only the local crest', () => {
   const attack = '</title><script>alert(1)</script><img src=x onerror=alert(2)> & "hola"';
-  const html = trainingPrintHtml({ ...plan, title: attack, notes: attack, entries: [{ ...entry, description: attack }] }, attack, clubCrestData);
+  const html = trainingPrintHtml({ ...plan, title: attack, notes: attack, entries: [{ ...entry, description: attack, sessionNotes: attack }] }, attack, clubCrestData);
   assert.equal(html.includes('<script>'), false); assert.equal(html.includes('<img src=x'), false);
   assert.ok(html.includes('&lt;script&gt;')); assert.ok(html.includes('&amp;')); assert.ok(html.includes('data:image/jpeg;base64,'));
   assert.ok(html.includes('@page { size: A4;')); assert.equal(html.includes('https://'), false);
   assert.match(trainingPdfFilename({ title: '../../Álex: sesión / 1', date: plan.date }), /^inter-2026-11-11-alex-sesion-1\.pdf$/);
+});
+test('session-specific notes appear beside the right exercise in the document and printed HTML', () => {
+  const first = 'Equipo azul: Álex e Iván.\nTandas de 3 minutos.', second = 'Equipo negro: rotaciones cada 2 minutos.';
+  const noted = { ...plan, entries: [{ ...entry, sessionNotes: first }, { ...entry, id: id(2), sessionNotes: second }] };
+  const sections = trainingDocument(noted, 'Alevín B').sections.filter(section => /^\d+\./.test(section.heading));
+  assert.ok(sections[0].paragraphs.includes('Notas para este ejercicio:\n' + first));
+  assert.ok(sections[1].paragraphs.includes('Notas para este ejercicio:\n' + second));
+  assert.equal(sections[0].paragraphs.some(text => text.includes(second)), false);
+  const html = trainingPrintHtml(noted, 'Alevín B', clubCrestData);
+  assert.ok(html.includes(first)); assert.ok(html.includes(second));
+  assert.equal(trainingPrintHtml(plan, 'Alevín B', clubCrestData).includes('Notas para este ejercicio:'), false);
 });
 test('PDF generator produces embedded-font A4 files and paginates long complete sessions', () => {
   const assets = { font: readFileSync(new URL('../assets/fonts/DejaVuSans.ttf', import.meta.url)).toString('base64'), boldFont: readFileSync(new URL('../assets/fonts/DejaVuSans-Bold.ttf', import.meta.url)).toString('base64'), crest: clubCrestData };

@@ -2,7 +2,7 @@ import { isCalendarDate } from './attendanceReport.ts';
 import { exerciseDraft, validateExercise } from './exercises.ts';
 import type { Exercise, ExerciseInput, Material } from './exercises';
 
-export type TrainingEntry = ExerciseInput & { id: string; exerciseId: string; exerciseRevision: number };
+export type TrainingEntry = ExerciseInput & { id: string; exerciseId: string; exerciseRevision: number; sessionNotes?: string };
 export type TrainingInput = { title: string; date: string; playerCount: number; notes: string; entries: TrainingEntry[] };
 export type TrainingPlan = TrainingInput & { id: string; teamId: string; createdBy: string | null; revision: number; archivedAt: string | null; copiedFrom?: string; copiedFromRevision?: number };
 export type TrainingDraft = Omit<TrainingInput, 'playerCount' | 'entries'> & { playerCount: string; entries: (Omit<TrainingEntry, 'duration'> & { duration: string })[] };
@@ -25,7 +25,7 @@ export function cloneTrainingPlan(source: TrainingPlan, request: TrainingCopy, c
   };
 }
 export function entryFromExercise(exercise: Exercise, id: string): TrainingEntry {
-  return { ...validateExercise(exerciseDraft(exercise)), id, exerciseId: exercise.id, exerciseRevision: exercise.revision };
+  return { ...validateExercise(exerciseDraft(exercise)), id, exerciseId: exercise.id, exerciseRevision: exercise.revision, sessionNotes: '' };
 }
 export function trainingDraft(plan: TrainingInput): TrainingDraft {
   return { ...plan, playerCount: String(plan.playerCount), entries: plan.entries.map(entry => ({ ...entry, duration: String(entry.duration) })) };
@@ -43,7 +43,10 @@ export function validateTraining(draft: TrainingDraft): TrainingInput {
     ids.add(entry.id);
     const input = validateExercise(exerciseDraft({ ...entry, duration: 1, id: entry.exerciseId, createdBy: null, revision: entry.exerciseRevision, archivedAt: null }));
     if (!/^\d+$/.test(entry.duration.trim()) || Number(entry.duration) < 1 || Number(entry.duration) > 240) throw new Error(`Duración de ${input.title}: indica entre 1 y 240 minutos.`);
-    return { ...input, duration: Number(entry.duration), id: entry.id, exerciseId: entry.exerciseId, exerciseRevision: entry.exerciseRevision };
+    if (entry.sessionNotes !== undefined && typeof entry.sessionNotes !== 'string') throw new Error(`Revisa las notas de ${input.title}.`);
+    const sessionNotes = (entry.sessionNotes ?? '').trim();
+    if (sessionNotes.length > 2000) throw new Error(`Las notas de ${input.title} pueden tener hasta 2000 caracteres.`);
+    return { ...input, duration: Number(entry.duration), id: entry.id, exerciseId: entry.exerciseId, exerciseRevision: entry.exerciseRevision, sessionNotes };
   });
   if (entries.reduce((sum, entry) => sum + entry.duration, 0) > 600) throw new Error('El entrenamiento no puede superar los 600 minutos.');
   return { title, date: draft.date, playerCount: Number(draft.playerCount), notes, entries };

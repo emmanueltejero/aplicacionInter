@@ -33,12 +33,12 @@ export const demoTrainingRepository: TrainingRepository = {
       const old = previous?.entries.find(item => item.id === entry.id);
       if (old) {
         if (old.exerciseId !== entry.exerciseId || old.exerciseRevision !== entry.exerciseRevision) throw new Error('No se puede cambiar el origen de un bloque guardado.');
-        return { ...old, duration: entry.duration };
+        return { ...old, duration: entry.duration, sessionNotes: entry.sessionNotes ?? old.sessionNotes ?? '' };
       }
       const source = exercises.find(item => item.id === entry.exerciseId && !item.archivedAt);
       if (!source) throw new Error('El ejercicio ya no está disponible en la biblioteca.');
       if (source.revision !== entry.exerciseRevision) throw new Error('Una ficha ha cambiado. Actualiza la biblioteca y quita y vuelve a añadir ese ejercicio.');
-      return { ...entryFromExercise(source, entry.id), duration: entry.duration };
+      return { ...entryFromExercise(source, entry.id), duration: entry.duration, sessionNotes: entry.sessionNotes ?? '' };
     });
     const input = validateTraining(trainingDraft({ ...request, entries }));
     const saved: TrainingPlan = { ...previous, ...input, id: request.id, teamId, createdBy: previous?.createdBy ?? 'demo-coach', revision: request.revision + 1,
@@ -66,7 +66,7 @@ function check(error: { code?: string } | null) {
   if (error?.code === '40001') throw new Error('El entrenamiento ha cambiado. Cierra el editor y actualiza los entrenamientos antes de editarlo.');
   if (error?.code === 'P0002') throw new Error('Una ficha ha cambiado. Actualiza la biblioteca y quita y vuelve a añadir ese ejercicio.');
   if (error?.code === '42501') throw new Error('Tu cuenta no tiene permiso para gestionar los entrenamientos de este equipo.');
-  if (error && ['22023', '23514', '23502', '22P02', '22003'].includes(error.code ?? '')) throw new Error('Revisa la fecha, los jugadores y las duraciones. Los ejercicios nuevos deben seguir activos en la biblioteca.');
+  if (error && ['22023', '23514', '23502', '22P02', '22003'].includes(error.code ?? '')) throw new Error('Revisa la fecha, los jugadores, las duraciones y las notas. Los ejercicios nuevos deben seguir activos en la biblioteca.');
   if (error) throw new Error('No se pudo guardar o consultar el entrenamiento. Revisa la conexión e inténtalo de nuevo.');
 }
 type RemotePlan = { id: string; team_id: string; created_by: string | null; revision: number; archived_at: string | null;
@@ -89,9 +89,10 @@ export function remoteTrainingRepository(client: SupabaseClient): TrainingReposi
       }
     },
     async save(teamId, request) {
-      const result = await client.rpc('save_training_plan', { p_team: teamId, p_id: request.id, p_revision: request.revision,
+      const result = await client.rpc('save_training_plan_with_entry_notes', { p_team: teamId, p_id: request.id, p_revision: request.revision,
         p_date: request.date, p_title: request.title, p_player_count: request.playerCount, p_notes: request.notes,
-        p_archived: request.archived, p_entries: request.entries.map(entry => ({ id: entry.id, exerciseId: entry.exerciseId, exerciseRevision: entry.exerciseRevision, duration: entry.duration })) });
+        p_archived: request.archived, p_entries: request.entries.map(entry => ({ id: entry.id, exerciseId: entry.exerciseId, exerciseRevision: entry.exerciseRevision, duration: entry.duration, sessionNotes: entry.sessionNotes ?? '' })) });
+      if (result.error && ['PGRST202', '42883'].includes(result.error.code ?? '')) throw new Error('Falta activar las notas por ejercicio. Un administrador debe actualizar los entrenamientos en Supabase. Tus cambios siguen en este editor.');
       check(result.error);
       if (!result.data || result.data.id !== request.id || result.data.team_id !== teamId) throw new Error('No se pudo confirmar el guardado del entrenamiento.');
       return fromRemote(result.data as RemotePlan);

@@ -23,6 +23,7 @@ export function trainingDocument(plan: TrainingPlan, teamName: string): Training
     ...plan.entries.map((entry, index) => ({ heading: `${index + 1}. ${entry.title}`, imagePath: entry.imagePath, videoUrl: exerciseVideoUrl(entry.videoUrl), paragraphs: [
       `Minuto ${totals.timeline[index].start}–${totals.timeline[index].end} · ${entry.duration} minutos · ${entry.categories.join(' · ')}`,
       `${entry.minPlayers}–${entry.maxPlayers} jugadores · Espacio: ${entry.spaceLength} × ${entry.spaceWidth} m`,
+      ...(entry.sessionNotes ? [`Notas para este ejercicio:\n${entry.sessionNotes}`] : []),
       entry.description,
       `Material: ${entry.materials.map(item => `${item.quantity} ${item.name}`).join(' · ') || 'Sin material'}`,
     ] })),

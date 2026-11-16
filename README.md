@@ -163,6 +163,14 @@ Activa las cuentas reales ejecutando la [ampliación de entrenamientos](supabase
 
 Los planes pueden seguir editándose con sus bloques guardados si la biblioteca no carga. Los fallos de guardado mantienen el formulario; las ediciones antiguas no sobrescriben versiones recientes y los reintentos idénticos no crean duplicados. Las pruebas cubren los cálculos, filtros, permisos, orden, copias históricas y reintentos en PostgreSQL local y en navegador móvil con datos ficticios y respuestas simuladas. La integración remota real requiere aplicar el SQL y guardar desde una cuenta del club.
 
+### Notas por ejercicio en una sesión
+
+Cada bloque tiene **Notas para este ejercicio**, con hasta 2000 caracteres para grupos, equipos, rotaciones o tandas. Son independientes de la ficha compartida y de otros bloques del mismo ejercicio. Se pueden editar o vaciar, siguen al bloque al reordenarlo y se conservan en las copias. **Ver plan**, el PDF y la impresión las muestran junto al ejercicio correspondiente. Solo cambian al guardar el entrenamiento.
+
+Para activar el guardado real, ejecuta [202611160001_training_entry_notes.sql](supabase/migrations/202611160001_training_entry_notes.sql) en Supabase, después de la ampliación de imágenes ya existente. No cambia las tablas ni reescribe entrenamientos antiguos: amplía el guardado de las copias JSON con `sessionNotes`. La nueva web usa `save_training_plan_with_entry_notes` para evitar perder notas silenciosamente si falta la migración; muestra un aviso y conserva el editor. El guardado anterior sigue disponible y conserva las notas cuando una versión antigua no envía ese campo. Los permisos de equipo, revisión y acceso de solo consulta de MCP se mantienen.
+
+Se han probado validación, compatibilidad con planes antiguos, guardados/reintentos, borrado de notas, archivo y duplicación con PostgreSQL local. Chromium móvil ha comprobado persistencia, reordenación de ejercicios repetidos, edición independiente de una copia, detalle, texto extraído de un PDF descargado e impresión con HTML escapado. Las pruebas usan datos ficticios; el guardado en el Supabase del club requiere ejecutar el SQL y comprobarlo desde una cuenta real.
+
 ### Duplicar para otra fecha
 
 Cada plan tiene **Duplicar para otra fecha**. Permite elegir nombre y fecha y crea un plan independiente, activo, con nuevos identificadores de bloque, revisión 1 y autoría de quien lo duplica. Conserva los jugadores previstos, notas, orden, duraciones y fichas históricas, aunque las fichas de origen hayan cambiado, estén archivadas o ya no existan en la biblioteca. Después se puede editar la copia sin cambiar el original. También se pueden duplicar planes archivados.
